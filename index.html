@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Controle de Processos</title>
+<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2316233A'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='%23F7F5EF' font-family='monospace'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="overlay open" id="login-overlay" style="z-index:100;">
+  <div class="modal" style="max-width:340px; text-align:center;">
+    <h2 style="border:none; margin-bottom:6px;">Controle de processos</h2>
+    <p style="color:var(--ink-soft); font-size:13px; margin:0 0 16px;">Entre com sua conta da equipe</p>
+    <div class="field" style="text-align:left;">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="seuemail@empresa.com" autocomplete="username">
+    </div>
+    <div class="field" style="text-align:left;">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="Senha" autocomplete="current-password">
+    </div>
+    <div class="status-msg" id="login-error"></div>
+    <div class="modal-actions" style="justify-content:center;">
+      <button id="btn-login">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div id="aviso-banner" style="display:none; position:sticky; top:0; z-index:95; background:#A6402F; color:#fff; padding:10px 16px; border-radius:var(--radius); margin-bottom:16px; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+    <div style="flex:1; min-width:0;">
+      <strong style="text-transform:uppercase; letter-spacing:0.5px; font-size:11px; opacity:0.85;">Aviso</strong>
+      <div id="aviso-banner-texto" style="font-size:14px; margin-top:2px; word-break:break-word;"></div>
+    </div>
+    <button type="button" id="btn-fechar-aviso" style="background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.4); color:#fff; padding:5px 12px; border-radius:6px; cursor:pointer; flex-shrink:0; font-family:'IBM Plex Sans', sans-serif; font-size:12px;">Ok, entendi</button>
+  </div>
+
+  <header>
+    <svg class="voyage-scene" id="voyage-scene" viewBox="0 0 900 140" preserveAspectRatio="xMidYMid slice" style="display:none;">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0B0F17"/>
+          <stop offset="100%" stop-color="#182A34"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="900" height="140" fill="url(#skyGrad)"/>
+      <circle cx="60" cy="24" r="1.4" fill="#E8E1CD" opacity="0.7"/>
+      <circle cx="140" cy="45" r="1" fill="#E8E1CD" opacity="0.5"/>
+      <circle cx="230" cy="20" r="1.3" fill="#E8E1CD" opacity="0.6"/>
+      <circle cx="470" cy="30" r="1" fill="#E8E1CD" opacity="0.5"/>
+      <circle cx="560" cy="18" r="1.4" fill="#E8E1CD" opacity="0.7"/>
+      <circle cx="650" cy="42" r="1" fill="#E8E1CD" opacity="0.4"/>
+      <circle cx="820" cy="24" r="1.3" fill="#E8E1CD" opacity="0.6"/>
+      <circle cx="880" cy="50" r="1" fill="#E8E1CD" opacity="0.5"/>
+      <circle cx="780" cy="34" r="20" fill="#C9A227"/>
+      <circle cx="790" cy="27" r="17" fill="#0B0F17"/>
+      <path d="M540,42 Q518,18 495,34 Q518,38 538,46 Z" fill="#0B0F17" opacity="0.8"/>
+      <path d="M556,42 Q578,18 601,34 Q578,38 558,46 Z" fill="#0B0F17" opacity="0.8"/>
+      <ellipse cx="548" cy="44" rx="9" ry="3.5" fill="#0B0F17" opacity="0.8"/>
+      <polygon points="0,110 70,72 150,102 250,66 340,98 430,74 520,100 610,70 700,100 800,76 900,102 900,140 0,140"
+        fill="#16222E" opacity="0.55"/>
+      <polygon points="0,140 60,96 150,118 240,90 330,116 420,94 900,116 900,140"
+        fill="#0F1620" opacity="0.85"/>
+      <path d="M0,112 Q50,106 100,112 T200,112 T300,112 T400,112 T500,112 T600,112 T700,112 T800,112 T900,112"
+        stroke="#3E93A8" stroke-width="1.4" fill="none" opacity="0.35"/>
+      <path d="M0,122 Q50,117 100,122 T200,122 T300,122 T400,122 T500,122 T600,122 T700,122 T800,122 T900,122"
+        stroke="#3E93A8" stroke-width="1.2" fill="none" opacity="0.25"/>
+      <path d="M300,109 C288,98 284,84 291,75" stroke="#0B0F17" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M300,108 Q312,120 342,120 L378,120 Q408,120 418,108 Z" fill="#0B0F17"/>
+      <rect x="357" y="58" width="3" height="60" fill="#0B0F17"/>
+      <polygon points="360,61 360,106 393,101" fill="#16222E" opacity="0.9"/>
+    </svg>
+    <div>
+      <h1>Controle de processos</h1>
+      <p>Abertura, vistoria e endereçamento — registro compartilhado da equipe</p>
+    </div>
+    <div class="user-box" id="user-box">
+      <svg id="user-box-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <svg id="user-box-icon-admin" class="compass-badge" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" style="display:none;">
+        <circle cx="12" cy="12" r="10"/>
+        <polygon points="12,4 13.6,12 12,10.4 10.4,12" fill="currentColor" stroke="none"/>
+        <polygon points="12,20 13.6,12 12,13.6 10.4,12" fill="currentColor" stroke="none" opacity="0.5"/>
+      </svg>
+      <span id="role-badge"></span>
+      <span class="user-box-divider"></span>
+      <div style="position:relative;">
+        <button type="button" class="icon-btn" id="btn-notificacoes" title="Notificações" aria-label="Notificações" style="margin-left:0;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="notif-badge" style="display:none; position:absolute; top:-4px; right:-4px; background:var(--red); color:#fff; font-size:9px; font-weight:700; border-radius:50%; width:15px; height:15px; align-items:center; justify-content:center;">0</span>
+        </button>
+        <div class="date-popover" id="notif-popover" style="left:auto; right:0; width:270px; padding:0;"></div>
+      </div>
+      <span class="user-box-divider"></span>
+      <button type="button" class="icon-btn" id="btn-toggle-theme" title="Alternar tema" aria-label="Alternar tema" style="display:none;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.4 5.4 0 0 1-7.54-7.54A9 9 0 0 0 12 3z"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-open-senha" title="Trocar senha" aria-label="Trocar senha">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4"/><path d="M16 7l3 3"/><path d="M13 10l2.5 2.5"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-logout" title="Sair" aria-label="Sair">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+
+
+  <div class="stats" id="stats"></div>
+
+  <div class="charts">
+    <div class="chart-card chart-card-clickable" onclick="ampliarGrafico('bairro')">
+      <h3>Por bairro</h3>
+      <div class="chart-inner"><canvas id="chart-bairro"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-clickable" onclick="ampliarGrafico('status')">
+      <h3>Status da vistoria</h3>
+      <div class="chart-inner"><canvas id="chart-status"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-clickable" onclick="ampliarGrafico('responsavel')">
+      <h3>Por responsável</h3>
+      <div class="chart-inner"><canvas id="chart-colab"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-clickable" onclick="ampliarGrafico('tiposervico')">
+      <h3>Tipo de serviço</h3>
+      <div class="chart-inner"><canvas id="chart-tiposervico"></canvas></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="secondary" id="btn-toggle-filtros" title="Mostrar/ocultar filtros" aria-label="Filtros">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      Filtros
+    </button>
+    <button class="icon-btn" id="btn-densidade" title="Alternar densidade da tabela" aria-label="Densidade" style="margin-left:0;">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    </button>
+    <input type="search" id="f-busca" placeholder="Buscar em qualquer campo">
+    <div class="spacer"></div>
+    <input type="file" id="import-file" accept=".csv" style="display:none;">
+    <div style="position:relative;" id="csv-menu-wrap">
+      <button class="secondary" id="btn-csv-menu">CSV ▾</button>
+      <div class="admin-dropdown" id="csv-dropdown">
+        <button class="secondary" id="btn-export">Exportar CSV</button>
+        <button class="secondary" id="btn-import">Importar CSV</button>
+      </div>
+    </div>
+    <button class="secondary" id="btn-mapa">Ver mapa</button>
+    <button class="secondary" id="btn-chamados">Chamados</button>
+    <button class="secondary" id="btn-anotacoes">Anotações</button>
+    <div style="position:relative;" id="admin-menu-wrap">
+      <button class="secondary" id="btn-admin-menu">Admin ▾</button>
+      <div class="admin-dropdown" id="admin-dropdown">
+        <span class="admin-dropdown-categoria">Monitoramento</span>
+        <button class="secondary" id="btn-atividade">Atividade recente</button>
+        <button class="secondary" id="btn-historico">Histórico de exclusões</button>
+
+        <span class="admin-dropdown-categoria">Dados</span>
+        <button class="secondary" id="btn-backup">Backup completo</button>
+        <input type="file" id="restore-file" accept=".json" style="display:none;">
+        <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-restore">Restaurar backup</button>
+        <button class="secondary" id="btn-geocodificar">Geocodificar pendentes</button>
+
+        <span class="admin-dropdown-categoria">Comunicação</span>
+        <button class="secondary" id="btn-abrir-aviso">Enviar aviso</button>
+      </div>
+    </div>
+        <button id="btn-novo">+ Novo registro</button>
+  </div>
+
+  <div class="filters-panel" id="filters-panel">
+    <input type="text" id="f-colab" list="list-colab" placeholder="Colab: todos">
+    <input type="text" id="f-responsavel" list="list-responsavel" placeholder="Responsável: todos">
+    <div style="position:relative;">
+      <input type="text" id="f-bairro" placeholder="Bairro: todos" autocomplete="off">
+      <div class="date-popover" id="f-bairro-popover" style="left:0; right:auto; width:220px; max-height:180px; overflow:auto; padding:4px;"></div>
+    </div>
+    <select id="f-tiposervico">
+      <option value="">Tipo de serviço: todos</option>
+      <option value="pavimentacao">Pavimentação</option>
+      <option value="obra_civil">Obra Civil</option>
+    </select>
+    <select id="f-status">
+      <option value="">Vistoria: todas</option>
+      <option value="pendente">Pendente</option>
+      <option value="agendada">Agendada</option>
+      <option value="realizada">Realizada</option>
+    </select>
+    <div style="position:relative;">
+      <button type="button" class="secondary" id="btn-daterange">Período: todos</button>
+      <div class="date-popover" id="date-popover"></div>
+    </div>
+    <label id="parada-wrap" style="display:none; align-items:center; gap:6px; font-size:13px; color:var(--ink-soft); cursor:pointer;">
+      <input type="checkbox" id="f-paradas">
+      Só paradas (não realizada há mais de
+      <input type="number" id="f-paradas-dias" value="7" min="1" style="width:48px; padding:4px 6px;">
+      dias)
+    </label>
+  </div>
+
+  <div class="status-msg" id="import-status"></div>
+
+  <div class="bulk-bar" id="bulk-bar">
+    <span id="bulk-count"></span>
+    <select id="bulk-status">
+      <option value="">Alterar vistoria para…</option>
+      <option value="pendente">Pendente</option>
+      <option value="agendada">Agendada</option>
+      <option value="realizada">Realizada</option>
+    </select>
+    <button class="secondary" id="btn-bulk-apply-status">Aplicar</button>
+    <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-bulk-delete">Excluir selecionados</button>
+    <button class="secondary" id="btn-bulk-clear">Limpar seleção</button>
+  </div>
+
+  <div class="table-card">
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:32px; text-align:center;"><input type="checkbox" id="select-all-checkbox"></th>
+          <th data-key="colab">Colab</th>
+          <th data-key="responsavel">Responsável</th>
+          <th data-key="tipoServico">Tipo de serviço</th>
+          <th data-key="processo">Abertura de processo</th>
+          <th data-key="vistoria">Vistoria</th>
+          <th data-key="data">Data</th>
+          <th data-key="endereco">Endereço</th>
+          <th data-key="bairro">Bairro</th>
+          <th style="text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="empty-row"><td colspan="10">Carregando registros…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <p class="footnote">Os dados ficam salvos na nuvem e visíveis para todos que abrirem este link — atualiza automaticamente a cada 20 segundos.</p>
+</div>
+
+<div class="overlay" id="chart-zoom-overlay">
+  <div class="modal" style="max-width:700px; width:90vw;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 id="chart-zoom-titulo" style="border:none; margin:0;"></h2>
+      <button class="secondary" id="btn-fechar-chart-zoom">Fechar</button>
+    </div>
+    <div style="position:relative; height:60vh; max-height:460px;">
+      <canvas id="chart-zoom-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modal-title">Novo registro</h2>
+    <div class="field">
+      <label>Colab</label>
+      <input id="in-colab" list="list-colab" placeholder="Nome do colaborador">
+      <datalist id="list-colab"></datalist>
+    </div>
+    <div class="field">
+      <label>Responsável</label>
+      <input id="in-responsavel" list="list-responsavel" placeholder="Nome do responsável">
+      <datalist id="list-responsavel"></datalist>
+    </div>
+    <div class="field">
+      <label>Abertura de processo</label>
+      <input id="in-processo" placeholder="Número ou identificação do processo">
+    </div>
+    <div class="field">
+      <label>Tipo de serviço</label>
+      <select id="in-tiposervico">
+        <option value="pavimentacao">Pavimentação</option>
+        <option value="obra_civil">Obra Civil</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Vistoria</label>
+      <select id="in-vistoria">
+        <option value="pendente">Pendente</option>
+        <option value="agendada">Agendada</option>
+        <option value="realizada">Realizada</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <div style="position:relative; display:flex; gap:6px;">
+        <input type="text" id="in-data" placeholder="DD/MM/AAAA" inputmode="numeric" style="flex:1;">
+        <button type="button" class="icon-btn" id="btn-abrir-calendario-data" title="Escolher no calendário" aria-label="Escolher no calendário" style="margin-left:0;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+        <div class="date-popover" id="form-date-popover" style="left:auto; right:0;"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Endereço</label>
+      <input id="in-endereco" placeholder="Rua, número">
+    </div>
+    <div class="field" style="position:relative;">
+      <label>Bairro</label>
+      <input id="in-bairro" placeholder="Comece a digitar o bairro..." autocomplete="off">
+      <div class="date-popover" id="bairro-popover" style="left:0; right:auto; width:100%; max-height:180px; overflow:auto; padding:4px;"></div>
+    </div>
+    <div class="status-msg" id="modal-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar">Cancelar</button>
+      <button id="btn-salvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="floating-panel" id="atividade-overlay" style="top:90px; left:90px; width:700px; height:460px;">
+  <div class="floating-panel-header" id="atividade-drag-handle">
+    <strong>Atividade recente</strong>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="status-msg" id="atividade-status" style="margin:0;"></span>
+      <button type="button" class="icon-btn" id="btn-fechar-atividade" title="Fechar" aria-label="Fechar" style="margin-left:0;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="floating-panel-body">
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap;">
+      <div id="atividade-resumo" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <div style="width:70px; height:70px; flex-shrink:0;"><canvas id="atividade-chart"></canvas></div>
+    </div>
+    <div class="atividade-toolbar">
+      <div class="atividade-toolbar-group">
+        <button type="button" class="icon-btn" id="atividade-dia-anterior" title="Dia anterior">‹</button>
+        <input type="date" id="atividade-data">
+        <button type="button" class="icon-btn" id="atividade-dia-seguinte" title="Próximo dia">›</button>
+      </div>
+      <button type="button" class="secondary" id="atividade-todas-datas">Todas as datas</button>
+      <span class="atividade-toolbar-divider"></span>
+      <select id="atividade-quem"><option value="">Quem: todos</option></select>
+      <select id="atividade-acao">
+        <option value="">Ação: todas</option>
+        <option value="criado">Criado</option>
+        <option value="editado">Editado</option>
+        <option value="excluido">Excluído</option>
+      </select>
+      <input type="search" id="atividade-busca" placeholder="Buscar Colab ou Processo">
+      <div class="spacer"></div>
+      <button type="button" class="secondary" id="atividade-exportar">Exportar CSV</button>
+    </div>
+    <p style="margin:0 0 8px; font-size:11px; color:var(--ink-soft);">Atualiza sozinho a cada 20 segundos. Arraste pelo topo pra mover, ou pelo canto inferior direito pra redimensionar.</p>
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:var(--ink); color:var(--paper-2);">
+          <th style="text-align:left; padding:6px 8px;">Ação</th>
+          <th style="text-align:left; padding:6px 8px;">Quem</th>
+          <th style="text-align:left; padding:6px 8px;">Detalhe</th>
+          <th style="text-align:left; padding:6px 8px;">Quando</th>
+        </tr>
+      </thead>
+      <tbody id="atividade-tbody">
+        <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="resize-handle" id="atividade-resize-handle"></div>
+</div>
+
+<div class="floating-panel" id="chamados-overlay" style="top:100px; left:100px; width:640px; height:480px;">
+  <div class="floating-panel-header" id="chamados-drag-handle">
+    <strong>Chamados</strong>
+    <button type="button" class="icon-btn" id="btn-fechar-chamados" title="Fechar" aria-label="Fechar" style="margin-left:0;">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="floating-panel-body" id="chamados-lista-view">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+      <p style="margin:0; font-size:12px; color:var(--ink-soft);">Solicitações e problemas relatados pela equipe.</p>
+      <button type="button" id="btn-novo-chamado">+ Novo chamado</button>
+    </div>
+    <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+      <select id="chamado-filtro-status" style="font-size:12px; padding:6px 8px;">
+        <option value="">Status: todos</option>
+        <option value="aberto">Aberto</option>
+        <option value="em_andamento">Em andamento</option>
+        <option value="resolvido">Resolvido</option>
+      </select>
+      <input type="search" id="chamado-filtro-busca" placeholder="Buscar por título" style="flex:1; min-width:120px; font-size:12px; padding:6px 8px;">
+    </div>
+    <div id="chamados-lista"></div>
+  </div>
+  <div class="floating-panel-body" id="chamados-form-view" style="display:none;">
+    <h3 style="margin:0 0 10px; font-family:'IBM Plex Mono', monospace; font-size:14px;">Novo chamado</h3>
+    <div class="field">
+      <label>Título</label>
+      <input id="chamado-titulo" placeholder="Resumo do problema ou pedido">
+    </div>
+    <div class="field">
+      <label>Descrição</label>
+      <textarea id="chamado-descricao" rows="4" style="width:100%; font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink);" placeholder="Explique o que aconteceu..."></textarea>
+    </div>
+    <div class="status-msg" id="chamado-form-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-chamado">Cancelar</button>
+      <button id="btn-enviar-chamado">Enviar</button>
+    </div>
+  </div>
+  <div class="floating-panel-body" id="chamados-thread-view" style="display:none; flex-direction:column;">
+    <button type="button" class="secondary" id="btn-voltar-chamados" style="margin-bottom:10px; align-self:flex-start;">‹ Voltar</button>
+    <div id="chamado-thread-header" style="margin-bottom:8px;"></div>
+    <div id="chamado-thread-mensagens" style="flex:1; overflow:auto; border:1px solid var(--line); border-radius:var(--radius); padding:10px; background:#fff; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:8px;">
+      <input id="chamado-nova-mensagem" placeholder="Escrever uma resposta..." style="flex:1;">
+      <button id="btn-responder-chamado">Enviar</button>
+    </div>
+  </div>
+  <div class="resize-handle" id="chamados-resize-handle"></div>
+</div>
+
+<div class="floating-panel" id="anotacoes-overlay" style="top:120px; left:140px; width:480px; height:520px;">
+  <div class="floating-panel-header" id="anotacoes-drag-handle">
+    <strong>Anotações</strong>
+    <button type="button" class="icon-btn" id="btn-fechar-anotacoes" title="Fechar" aria-label="Fechar" style="margin-left:0;">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="floating-panel-body" style="display:flex; flex-direction:column;">
+    <div id="anotacoes-lista" style="flex:1; overflow:auto; margin-bottom:8px;"></div>
+    <div style="position:relative; display:flex; gap:8px;">
+      <input id="anotacao-texto" placeholder="Escreva uma anotação... use @ pra mencionar" style="flex:1;" autocomplete="off">
+      <button id="btn-enviar-anotacao">Enviar</button>
+      <div id="mencao-popover" class="date-popover" style="left:0; bottom:calc(100% + 6px); top:auto; width:200px;"></div>
+    </div>
+  </div>
+  <div class="resize-handle" id="anotacoes-resize-handle"></div>
+</div>
+
+<div class="floating-panel" id="nota-colab-overlay" style="top:140px; left:180px; width:420px; height:460px;">
+  <div class="floating-panel-header" id="nota-colab-drag-handle">
+    <strong id="nota-colab-titulo">Anotações do Colab</strong>
+    <button type="button" class="icon-btn" id="btn-fechar-nota-colab" title="Fechar" aria-label="Fechar" style="margin-left:0;">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="floating-panel-body" style="display:flex; flex-direction:column;">
+    <div id="nota-colab-lista" style="flex:1; overflow:auto; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:8px;">
+      <input id="nota-colab-texto" placeholder="Escreva uma anotação sobre este Colab..." style="flex:1;" autocomplete="off">
+      <button id="btn-enviar-nota-colab">Enviar</button>
+    </div>
+  </div>
+  <div class="resize-handle" id="nota-colab-resize-handle"></div>
+</div>
+
+<div class="overlay" id="historico-overlay">
+  <div class="modal" style="max-width:760px;">
+    <h2>Histórico de exclusões</h2>
+    <div style="max-height:60vh; overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead>
+          <tr style="background:var(--ink); color:var(--paper-2);">
+            <th style="text-align:left; padding:6px 8px;">Colab</th>
+            <th style="text-align:left; padding:6px 8px;">Responsável</th>
+            <th style="text-align:left; padding:6px 8px;">Processo</th>
+            <th style="text-align:left; padding:6px 8px;">Endereço</th>
+            <th style="text-align:left; padding:6px 8px;">Excluído por</th>
+            <th style="text-align:left; padding:6px 8px;">Excluído em</th>
+          </tr>
+        </thead>
+        <tbody id="historico-tbody">
+          <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-limpar-historico">Limpar histórico</button>
+      <button class="secondary" id="btn-fechar-historico">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="aviso-form-overlay">
+  <div class="modal" style="max-width:420px;">
+    <h2>Enviar aviso pra todo mundo</h2>
+    <p style="margin:0 0 10px; font-size:12px; color:var(--ink-soft);">Aparece como um banner fixo no topo da tela de todo mundo que estiver logado, até você removê-lo.</p>
+    <div class="field">
+      <label>Mensagem</label>
+      <textarea id="aviso-texto" rows="3" style="width:100%; font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink);" placeholder="Ex: Vou atualizar o sistema em 1 minuto, salvem o que estiverem fazendo."></textarea>
+    </div>
+    <div class="status-msg" id="aviso-form-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-remover-aviso">Remover aviso atual</button>
+      <button class="secondary" id="btn-cancelar-aviso">Cancelar</button>
+      <button id="btn-enviar-aviso-form">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="senha-overlay">
+  <div class="modal" style="max-width:360px;">
+    <h2>Trocar minha senha</h2>
+    <div class="field">
+      <label>Nova senha</label>
+      <input type="password" id="senha-nova" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label>Confirmar nova senha</label>
+      <input type="password" id="senha-confirma" placeholder="Repita a senha" autocomplete="new-password">
+    </div>
+    <div class="status-msg" id="senha-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-senha">Cancelar</button>
+      <button id="btn-salvar-senha">Salvar nova senha</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="import-preview-overlay">
+  <div class="modal" style="max-width:820px;">
+    <h2>Prévia da importação</h2>
+    <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; background:rgba(59,110,146,0.08); border:1px solid var(--blue); border-radius:var(--radius); padding:10px 12px; margin-bottom:12px; cursor:pointer;">
+      <input type="checkbox" id="import-modo-atualizacao" style="margin-top:2px;">
+      <span><b>Esta importação atualiza o status de Colabs já existentes</b><br>
+      <span style="color:var(--ink-soft); font-size:12px;">Marque isso quando o arquivo for uma lista de Colabs já cadastrados com a Vistoria nova (ex: agendados que viraram realizados). Colabs que já existem terão a Vistoria atualizada em vez de serem pulados. Colabs novos continuam sendo cadastrados normalmente.</span></span>
+    </label>
+    <div id="import-preview-body" style="max-height:50vh; overflow:auto;"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-import">Cancelar</button>
+      <button id="btn-confirmar-import">Confirmar e importar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mapa-overlay">
+  <div class="modal" style="max-width:min(1000px, 94vw); width:94vw; height:88vh; display:flex; flex-direction:column; padding:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="border:none; margin:0;">Mapa dos registros</h2>
+      <button class="secondary" id="btn-fechar-mapa">Fechar</button>
+    </div>
+    <p style="margin:0 0 8px; font-size:12px; color:var(--ink-soft);">Mostra os registros com endereço já geocodificado, respeitando os filtros ativos.</p>
+    <div style="position:relative; flex:1;">
+      <div id="mapa-container" style="position:absolute; inset:0; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);"></div>
+      <div id="mapa-legenda" style="position:absolute; bottom:10px; left:10px; z-index:1000; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px; font-size:12px; box-shadow:0 2px 8px rgba(22,35,58,0.15);">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:10px; height:10px; border-radius:50%; background:#C2792E; display:inline-block;"></span> Pendente</div>
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:10px; height:10px; border-radius:50%; background:#3B6E92; display:inline-block;"></span> Agendada</div>
+        <div style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:50%; background:#4B7A5D; display:inline-block;"></span> Realizada</div>
+      </div>
+    </div>
+    <div class="status-msg" id="mapa-status"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

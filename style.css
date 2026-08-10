@@ -148,7 +148,7 @@
   body.compact-mode tbody td{padding:4px 10px; font-size:12px;}
   body.compact-mode thead th{padding:6px 10px;}
   body.compact-mode .stamp{padding:1px 6px; font-size:10px;}
-  td.mono, .mono{font-family:'IBM Plex Mono', monospace;}
+  td.mono, .mono{font-family:'IBM Plex Mono', monospace; white-space:nowrap;}
   tr.row-clickable{cursor:pointer;}
   tr.row-clickable:hover td{background:rgba(59,110,146,0.05);}
   td.actions{white-space:nowrap; text-align:right;}

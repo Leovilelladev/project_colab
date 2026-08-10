@@ -1,0 +1,13 @@
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Vercel CLI (se usar `vercel dev`/`vercel link` localmente)
+.vercel
+
+# backups locais que às vezes ficam soltos na pasta ao testar
+*.bak
+*.orig

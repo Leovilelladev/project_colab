@@ -187,8 +187,11 @@ function avatarMatiz(str){
   for(let i = 0; i < s.length; i++){ hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
   return Math.abs(hash) % 360;
 }
-function avatarHtml(nome, tamanho){
+function avatarHtml(nome, tamanho, urlFoto){
   const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
+  if(urlFoto){
+    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '">';
+  }
   const hue = avatarMatiz(nome);
   const iniciais = avatarIniciais(nome);
   return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
@@ -1321,13 +1324,18 @@ let chamadoAtualDados = null;
 
 async function buscarNomesEquipe(){
   try{
-    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome', { headers: supaHeaders() });
-    if(!res.ok) return {};
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome,avatar_url', { headers: supaHeaders() });
+    if(!res.ok) return { nomeDe: {}, fotoDe: {} };
     const perfis = await res.json();
     const nomeDe = {};
-    perfis.forEach(p => { if(p.email) nomeDe[p.email] = p.nome || p.email; });
-    return nomeDe;
-  }catch(e){ return {}; }
+    const fotoDe = {};
+    perfis.forEach(p => {
+      if(!p.email) return;
+      nomeDe[p.email] = p.nome || p.email;
+      if(p.avatar_url) fotoDe[p.email] = p.avatar_url;
+    });
+    return { nomeDe: nomeDe, fotoDe: fotoDe };
+  }catch(e){ return { nomeDe: {}, fotoDe: {} }; }
 }
 
 function mostrarChamadosView(view){
@@ -1462,13 +1470,13 @@ let chamadosNomeDeCache = {};
 async function carregarChamados(){
   const listaEl = document.getElementById('chamados-lista');
   try{
-    const [resChamados, nomeDe] = await Promise.all([
+    const [resChamados, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/chamados?select=*&order=criado_em.desc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
     if(!resChamados.ok) throw new Error('fail');
     chamadosListaCache = await resChamados.json();
-    chamadosNomeDeCache = nomeDe;
+    chamadosNomeDeCache = equipe.nomeDe;
     renderizarListaChamados();
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar os chamados.</p>';
@@ -1554,7 +1562,7 @@ async function carregarMensagensChamado(chamadoId){
   const headerEl = document.getElementById('chamado-thread-header');
   const msgsEl = document.getElementById('chamado-thread-mensagens');
   try{
-    const [resChamado, resMsgs, nomeDe] = await Promise.all([
+    const [resChamado, resMsgs, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/chamados?id=eq.' + encodeURIComponent(chamadoId) + '&select=*', { headers: supaHeaders() }),
       supaFetch(SUPABASE_URL + '/rest/v1/chamados_mensagens?chamado_id=eq.' + encodeURIComponent(chamadoId) + '&select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
@@ -1565,6 +1573,7 @@ async function carregarMensagensChamado(chamadoId){
     const mensagens = await resMsgs.json();
     if(!chamado){ headerEl.innerHTML = ''; msgsEl.innerHTML = '<p>Chamado não encontrado.</p>'; return; }
     chamadoAtualDados = chamado;
+    const nomeDe = equipe.nomeDe, fotoDe = equipe.fotoDe;
 
     const statusLabelChamado = { aberto:'Aberto', em_andamento:'Em andamento', resolvido:'Resolvido' };
     const autor = chamado.criado_por ? (nomeDe[chamado.criado_por] || chamado.criado_por) : '—';
@@ -1590,7 +1599,7 @@ async function carregarMensagensChamado(chamadoId){
     } else {
       msgsEl.innerHTML = mensagens.map(m => {
         const autorMsg = m.autor ? (nomeDe[m.autor] || m.autor) : '—';
-        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm') +
+        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm', m.autor ? fotoDe[m.autor] : null) +
           '<div class="chat-body"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
           '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
       }).join('');
@@ -1690,19 +1699,21 @@ function destacarMencoes(textoEscapado){
 
 let anotacoesCache = [];
 let anotacoesNomeDeCache = {};
+let anotacoesFotoDeCache = {};
 let anotacaoEditandoId = null;
 
 async function carregarAnotacoes(){
   const listaEl = document.getElementById('anotacoes-lista');
   try{
-    const [resAnot, nomeDe] = await Promise.all([
+    const [resAnot, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/anotacoes?select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
     if(!resAnot.ok) throw new Error('fail');
     anotacoesCache = await resAnot.json();
-    anotacoesNomeDeCache = nomeDe;
-    anotacoesNomes = [...new Set(Object.values(nomeDe)), 'everyone'];
+    anotacoesNomeDeCache = equipe.nomeDe;
+    anotacoesFotoDeCache = equipe.fotoDe;
+    anotacoesNomes = [...new Set(Object.values(equipe.nomeDe)), 'everyone'];
     renderAnotacoesLista();
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar as anotações.</p>';
@@ -1720,10 +1731,11 @@ function renderAnotacoesLista(){
 
   listaEl.innerHTML = anotacoesCache.map(a => {
     const autor = a.autor ? (anotacoesNomeDeCache[a.autor] || a.autor) : '—';
+    const foto = a.autor ? anotacoesFotoDeCache[a.autor] : null;
     const quandoTxt = new Date(a.criado_em).toLocaleString('pt-BR');
 
     if(a.id === anotacaoEditandoId){
-      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm') + '<div class="chat-body">' +
+      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) + '<div class="chat-body">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' +
         '<textarea id="anotacao-edit-input" rows="2" style="width:100%; font-family:\'IBM Plex Sans\', sans-serif; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink); box-sizing:border-box;">' + escHtml(a.mensagem) + '</textarea>' +
         '<div style="display:flex; gap:6px; margin-top:6px;">' +
@@ -1741,7 +1753,7 @@ function renderAnotacoesLista(){
         '</span>'
       : '';
     const msgHtml = destacarMencoes(escHtml(a.mensagem));
-    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm') + '<div class="chat-body">' +
+    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) + '<div class="chat-body">' +
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' + icones +
       '</div>' +
@@ -1829,7 +1841,7 @@ async function carregarNotaColab(){
   if(!notaColabRegistroId) return;
   const listaEl = document.getElementById('nota-colab-lista');
   try{
-    const [resNotas, nomeDe] = await Promise.all([
+    const [resNotas, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/registros_notas?registro_id=eq.' + encodeURIComponent(notaColabRegistroId) + '&select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
@@ -1840,8 +1852,9 @@ async function carregarNotaColab(){
       return;
     }
     listaEl.innerHTML = notas.map(n => {
-      const autor = n.autor ? (nomeDe[n.autor] || n.autor) : '—';
-      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm') +
+      const autor = n.autor ? (equipe.nomeDe[n.autor] || n.autor) : '—';
+      const foto = n.autor ? equipe.fotoDe[n.autor] : null;
+      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) +
         '<div class="chat-body"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
         '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
     }).join('');
@@ -2573,7 +2586,7 @@ function applyRolePermissions(){
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';
-  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg') : '';
+  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg', currentUser.avatarUrl) : '';
   document.getElementById('btn-toggle-theme').style.display = isAdmin() ? '' : 'none';
   document.body.classList.toggle('theme-admin', isAdmin());
   syncThemeVisuals();
@@ -2608,12 +2621,13 @@ async function doLogin(){
     accessToken = data.access_token;
     currentUser = { id: data.user.id, email: data.user.email };
 
-    const profRes = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id + '&select=role,nome', {
+    const profRes = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id + '&select=role,nome,avatar_url', {
       headers: supaHeaders()
     });
     const profData = await profRes.json();
     currentRole = (profData && profData[0] && profData[0].role) || 'operador';
     currentUser.nome = (profData && profData[0] && profData[0].nome) || currentUser.email;
+    currentUser.avatarUrl = (profData && profData[0] && profData[0].avatar_url) || null;
 
     errEl.textContent = '';
     document.getElementById('login-overlay').classList.remove('open');
@@ -2753,6 +2767,98 @@ async function salvarNovaSenha(){
     msgEl.textContent = 'Não foi possível trocar a senha. Tente novamente.';
   }
 }
+
+/* ===== Foto de perfil (avatar) ===== */
+let avatarArquivoSelecionado = null;
+
+function abrirAvatar(){
+  avatarArquivoSelecionado = null;
+  document.getElementById('avatar-file-input').value = '';
+  document.getElementById('avatar-msg').textContent = '';
+  document.getElementById('avatar-preview-wrap').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'md', currentUser.avatarUrl) : '';
+  document.getElementById('avatar-overlay').classList.add('open');
+}
+
+document.getElementById('avatar-file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  const msgEl = document.getElementById('avatar-msg');
+  avatarArquivoSelecionado = null;
+  if(!file) return;
+  const tiposPermitidos = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  if(!tiposPermitidos.includes(file.type)){
+    msgEl.textContent = 'Formato não suportado. Use PNG, JPG, WEBP ou GIF.';
+    return;
+  }
+  if(file.size > 3 * 1024 * 1024){
+    msgEl.textContent = 'Arquivo muito grande. Máximo 3 MB.';
+    return;
+  }
+  msgEl.textContent = '';
+  avatarArquivoSelecionado = file;
+  const previewUrl = URL.createObjectURL(file);
+  document.getElementById('avatar-preview-wrap').innerHTML = '<img class="avatar-3d avatar-3d-md avatar-3d-foto" src="' + previewUrl + '" alt="">';
+});
+
+async function salvarAvatar(){
+  const msgEl = document.getElementById('avatar-msg');
+  if(!avatarArquivoSelecionado){
+    msgEl.textContent = 'Escolha um arquivo antes de salvar.';
+    return;
+  }
+  if(!currentUser) return;
+  msgEl.textContent = 'Enviando…';
+  try{
+    const ext = ((avatarArquivoSelecionado.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'png';
+    const caminho = currentUser.id + '/avatar.' + ext;
+    const resUpload = await supaFetch(SUPABASE_URL + '/storage/v1/object/avatars/' + caminho, {
+      method: 'POST',
+      headers: supaHeaders({ 'Content-Type': avatarArquivoSelecionado.type, 'x-upsert': 'true' }),
+      body: avatarArquivoSelecionado
+    });
+    if(!resUpload.ok) throw new Error('upload falhou');
+
+    const urlPublica = SUPABASE_URL + '/storage/v1/object/public/avatars/' + caminho + '?v=' + Date.now();
+    const resPatch = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
+      method: 'PATCH',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify({ avatar_url: urlPublica })
+    });
+    if(!resPatch.ok) throw new Error('patch falhou');
+
+    currentUser.avatarUrl = urlPublica;
+    applyRolePermissions();
+    document.getElementById('avatar-overlay').classList.remove('open');
+    avatarArquivoSelecionado = null;
+  }catch(e){
+    msgEl.textContent = 'Não foi possível salvar a foto. Tente novamente.';
+  }
+}
+
+async function removerAvatar(){
+  if(!currentUser) return;
+  const msgEl = document.getElementById('avatar-msg');
+  msgEl.textContent = 'Removendo…';
+  try{
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
+      method: 'PATCH',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify({ avatar_url: null })
+    });
+    if(!res.ok) throw new Error('fail');
+    currentUser.avatarUrl = null;
+    applyRolePermissions();
+    document.getElementById('avatar-overlay').classList.remove('open');
+    avatarArquivoSelecionado = null;
+  }catch(e){
+    msgEl.textContent = 'Não foi possível remover a foto.';
+  }
+}
+
+document.getElementById('btn-open-avatar').addEventListener('click', (e)=>{ e.preventDefault(); abrirAvatar(); });
+document.getElementById('btn-cancelar-avatar').addEventListener('click', ()=> document.getElementById('avatar-overlay').classList.remove('open'));
+document.getElementById('btn-salvar-avatar').addEventListener('click', salvarAvatar);
+document.getElementById('btn-remover-avatar').addEventListener('click', removerAvatar);
+document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-overlay') document.getElementById('avatar-overlay').classList.remove('open'); });
 
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });

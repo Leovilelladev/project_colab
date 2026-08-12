@@ -109,6 +109,9 @@
       <button type="button" class="icon-btn" id="btn-toggle-theme" title="Alternar tema" aria-label="Alternar tema" style="display:none;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.4 5.4 0 0 1-7.54-7.54A9 9 0 0 0 12 3z"/></svg>
       </button>
+      <button type="button" class="icon-btn" id="btn-open-avatar" title="Trocar foto de perfil" aria-label="Trocar foto de perfil">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
       <button type="button" class="icon-btn" id="btn-open-senha" title="Trocar senha" aria-label="Trocar senha">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4"/><path d="M16 7l3 3"/><path d="M13 10l2.5 2.5"/></svg>
       </button>
@@ -506,6 +509,25 @@
       <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-remover-aviso">Remover aviso atual</button>
       <button class="secondary" id="btn-cancelar-aviso">Cancelar</button>
       <button id="btn-enviar-aviso-form">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="avatar-overlay">
+  <div class="modal" style="max-width:360px;">
+    <h2>Minha foto de perfil</h2>
+    <div style="display:flex; justify-content:center; margin:6px 0 14px;">
+      <span id="avatar-preview-wrap"></span>
+    </div>
+    <div class="field">
+      <label>Escolher foto ou GIF (máx. 3 MB)</label>
+      <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif">
+    </div>
+    <div class="status-msg" id="avatar-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-remover-avatar">Remover foto</button>
+      <button class="secondary" id="btn-cancelar-avatar">Cancelar</button>
+      <button id="btn-salvar-avatar">Salvar</button>
     </div>
   </div>
 </div>

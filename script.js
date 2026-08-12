@@ -243,10 +243,10 @@ function renderStats(){
   const realizada = records.filter(r=>r.vistoria==='realizada').length;
   const statusAtivo = document.getElementById('f-status').value;
   document.getElementById('stats').innerHTML = `
-    <div class="stat stat-clickable ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${total}</span><span class="l">Total</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${pendente}</span><span class="l">Pendentes</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${agendada}</span><span class="l">Agendadas</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${realizada}</span><span class="l">Realizadas</span></div>
+    <div class="stat stat-clickable stat-total ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${total}</span><span class="l">Total</span></div>
+    <div class="stat stat-clickable stat-pendente ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${pendente}</span><span class="l">Pendentes</span></div>
+    <div class="stat stat-clickable stat-agendada ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${agendada}</span><span class="l">Agendadas</span></div>
+    <div class="stat stat-clickable stat-realizada ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${realizada}</span><span class="l">Realizadas</span></div>
   `;
 }
 

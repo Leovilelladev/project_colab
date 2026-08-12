@@ -50,6 +50,26 @@
   .user-box .icon-btn{margin-left:0;}
   #role-badge{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600;}
   .user-box-divider{width:1px; height:16px; background:var(--line);}
+
+  /* avatares gerados */
+  .avatar-3d{
+    --avatar-hue:210;
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    border-radius:50%; font-family:'IBM Plex Mono', monospace; font-weight:700; color:#fff;
+    background:linear-gradient(135deg, hsl(var(--avatar-hue), 58%, 52%), hsl(var(--avatar-hue), 58%, 36%));
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -2px 3px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.25);
+    text-shadow:0 1px 2px rgba(0,0,0,0.3);
+    transition:transform 0.25s ease, box-shadow 0.25s ease;
+    cursor:default; user-select:none;
+  }
+  .avatar-3d:hover{
+    transform:perspective(300px) rotateY(18deg) rotateX(-10deg) scale(1.14);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -2px 3px rgba(0,0,0,0.25), 0 6px 14px rgba(0,0,0,0.3);
+  }
+  .avatar-3d-sm{width:22px; height:22px; font-size:9px;}
+  .avatar-3d-md{width:28px; height:28px; font-size:11px;}
+  .avatar-3d-lg{width:26px; height:26px; font-size:10px;}
+  .user-avatar-wrap:empty{display:none;}
   @keyframes pulse-badge{0%,100%{transform:scale(1);} 50%{transform:scale(1.18);}}
   #notif-badge{animation:pulse-badge 1.8s ease-in-out infinite;}
   .stats{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;}
@@ -246,6 +266,9 @@
   }
   .chat-bubble .chat-autor{font-weight:600; font-size:11px; color:var(--ink-soft); margin-bottom:2px; display:block;}
   .chat-bubble .chat-quando{font-size:10px; color:var(--ink-soft); margin-top:3px; display:block;}
+  .chat-row{display:flex; gap:8px; align-items:flex-start;}
+  .chat-row .avatar-3d{margin-top:1px;}
+  .chat-body{flex:1; min-width:0;}
   .mencao-pill{
     background:rgba(59,110,146,0.14); color:var(--blue-dark); font-weight:600;
     padding:0 4px; border-radius:4px;
@@ -449,6 +472,17 @@
   body.theme-admin .voyage-scene{
     display:block; position:absolute; inset:0; width:100%; height:100%;
     z-index:0; pointer-events:none;
+  }
+  body.theme-admin .voyage-scene-3d{
+    position:absolute; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none;
+  }
+  body.theme-admin .avatar-3d{
+    border:1px solid rgba(201,162,39,0.55);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(201,162,39,0.12);
+  }
+  body.theme-admin .avatar-3d:hover{
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 10px rgba(201,162,39,0.5);
   }
   body.theme-admin header::before{
     content:''; position:absolute; inset:0; z-index:1; pointer-events:none;

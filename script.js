@@ -174,6 +174,26 @@ function populateFilterOptions(){
 function escHtml(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function escAttr(s){ return escHtml(s); }
 
+/* ===== Avatares gerados (iniciais + cor determinística) ===== */
+function avatarIniciais(nome){
+  const partes = String(nome ?? '').trim().split(/\s+/).filter(Boolean);
+  if(partes.length === 0) return '?';
+  if(partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+function avatarMatiz(str){
+  let hash = 0;
+  const s = String(str ?? '?');
+  for(let i = 0; i < s.length; i++){ hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
+  return Math.abs(hash) % 360;
+}
+function avatarHtml(nome, tamanho){
+  const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
+  const hue = avatarMatiz(nome);
+  const iniciais = avatarIniciais(nome);
+  return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
+}
+
 function emptyStateRow(colspan, message){
   if(!document.body.classList.contains('theme-admin')){
     return '<tr class="empty-row"><td colspan="' + colspan + '">' + message + '</td></tr>';
@@ -1570,8 +1590,9 @@ async function carregarMensagensChamado(chamadoId){
     } else {
       msgsEl.innerHTML = mensagens.map(m => {
         const autorMsg = m.autor ? (nomeDe[m.autor] || m.autor) : '—';
-        return '<div class="chat-bubble"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
-          '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div>';
+        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm') +
+          '<div class="chat-body"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
+          '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
       }).join('');
     }
     msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -1702,14 +1723,14 @@ function renderAnotacoesLista(){
     const quandoTxt = new Date(a.criado_em).toLocaleString('pt-BR');
 
     if(a.id === anotacaoEditandoId){
-      return '<div class="chat-bubble" data-id="' + a.id + '">' +
+      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm') + '<div class="chat-body">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' +
         '<textarea id="anotacao-edit-input" rows="2" style="width:100%; font-family:\'IBM Plex Sans\', sans-serif; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink); box-sizing:border-box;">' + escHtml(a.mensagem) + '</textarea>' +
         '<div style="display:flex; gap:6px; margin-top:6px;">' +
           '<button type="button" class="secondary" onclick="cancelarEdicaoAnotacao()">Cancelar</button>' +
           '<button type="button" onclick="salvarEdicaoAnotacao(\'' + a.id + '\')">Salvar</button>' +
         '</div>' +
-      '</div>';
+      '</div></div></div>';
     }
 
     const podeEditar = currentUser && (currentUser.email === a.autor || isAdmin());
@@ -1720,13 +1741,13 @@ function renderAnotacoesLista(){
         '</span>'
       : '';
     const msgHtml = destacarMencoes(escHtml(a.mensagem));
-    return '<div class="chat-bubble" data-id="' + a.id + '">' +
+    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm') + '<div class="chat-body">' +
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' + icones +
       '</div>' +
       '<div>' + msgHtml + '</div>' +
       '<span class="chat-quando">' + quandoTxt + (a.editado_em ? ' · editado' : '') + '</span>' +
-    '</div>';
+    '</div></div></div>';
   }).join('');
   if(!anotacaoEditandoId) listaEl.scrollTop = listaEl.scrollHeight;
 }
@@ -1820,8 +1841,9 @@ async function carregarNotaColab(){
     }
     listaEl.innerHTML = notas.map(n => {
       const autor = n.autor ? (nomeDe[n.autor] || n.autor) : '—';
-      return '<div class="chat-bubble"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
-        '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div>';
+      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm') +
+        '<div class="chat-body"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
+        '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
     }).join('');
     listaEl.scrollTop = listaEl.scrollHeight;
   }catch(e){
@@ -2396,10 +2418,154 @@ function syncThemeVisuals(){
   const on = document.body.classList.contains('theme-admin');
   document.getElementById('user-box-icon').style.display = on ? 'none' : '';
   document.getElementById('user-box-icon-admin').style.display = on ? '' : 'none';
-  document.getElementById('voyage-scene').style.display = on ? 'block' : 'none';
+  const usar3D = on && typeof THREE !== 'undefined';
+  document.getElementById('voyage-scene').style.display = (on && !usar3D) ? 'block' : 'none';
+  atualizarVoyageScene3D(usar3D);
   document.getElementById('favicon').href = on
     ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230B0F17'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23C9A227' stroke-width='5'/%3E%3Cpolygon points='50,16 60,50 50,44 40,50' fill='%23C9A227'/%3E%3Cpolygon points='50,84 60,50 50,56 40,50' fill='%23C9A227' opacity='0.5'/%3E%3C/svg%3E"
     : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2316233A'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='%23F7F5EF' font-family='monospace'%3EP%3C/text%3E%3C/svg%3E";
+}
+
+/* ===== Cena 3D do cabeçalho — tema Admin (bússola do viajante) ===== */
+let voyage3D = null;
+
+function iniciarVoyageScene3D(){
+  if(voyage3D || typeof THREE === 'undefined') return;
+  const canvas = document.getElementById('voyage-scene-3d');
+  const header = document.querySelector('header');
+  if(!canvas || !header) return;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 100);
+  camera.position.set(0, 2.2, 9);
+  camera.lookAt(0, 0.5, 0);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0x8fa0ae, 0.9));
+  const luzDourada = new THREE.DirectionalLight(0xC9A227, 1.1);
+  luzDourada.position.set(3, 4, 2);
+  scene.add(luzDourada);
+
+  // estrelas
+  const starCount = 140;
+  const starPos = new Float32Array(starCount * 3);
+  for(let i = 0; i < starCount; i++){
+    starPos[i*3] = (Math.random() - 0.5) * 20;
+    starPos[i*3 + 1] = Math.random() * 5 + 1.5;
+    starPos[i*3 + 2] = (Math.random() - 0.5) * 10 - 2;
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xE8E1CD, size: 0.05, transparent: true, opacity: 0.8 });
+  const estrelas = new THREE.Points(starGeo, starMat);
+  scene.add(estrelas);
+
+  // oceano
+  const oceanGeo = new THREE.PlaneGeometry(30, 12, 60, 24);
+  const oceanMat = new THREE.MeshStandardMaterial({ color: 0x1F4C5A, transparent: true, opacity: 0.85, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.1 });
+  const oceano = new THREE.Mesh(oceanGeo, oceanMat);
+  oceano.rotation.x = -Math.PI / 2.4;
+  oceano.position.set(0, -1.4, -1);
+  scene.add(oceano);
+  const oceanPos = oceanGeo.attributes.position;
+  const oceanBase = Float32Array.from(oceanPos.array);
+
+  // navio estilizado
+  const navio = new THREE.Group();
+  const casco = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.55, 1.6, 4, 1, false),
+    new THREE.MeshStandardMaterial({ color: 0x0B0F17, roughness: 0.7 })
+  );
+  casco.rotation.z = Math.PI / 2;
+  casco.scale.set(1, 1, 0.5);
+  navio.add(casco);
+  const mastro = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), new THREE.MeshStandardMaterial({ color: 0x0B0F17 }));
+  mastro.position.y = 0.7;
+  navio.add(mastro);
+  const vela = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 3), new THREE.MeshStandardMaterial({ color: 0x16222E, side: THREE.DoubleSide }));
+  vela.rotation.z = Math.PI / 2;
+  vela.position.set(0.25, 0.75, 0);
+  navio.add(vela);
+  navio.position.set(-2.6, -0.6, 0.5);
+  navio.rotation.y = 0.3;
+  scene.add(navio);
+
+  // bússola do viajante
+  const bussola = new THREE.Group();
+  const anel = new THREE.Mesh(
+    new THREE.TorusGeometry(0.9, 0.05, 12, 40),
+    new THREE.MeshStandardMaterial({ color: 0xC9A227, metalness: 0.6, roughness: 0.3, emissive: 0x3a2d08, emissiveIntensity: 0.3 })
+  );
+  bussola.add(anel);
+  const agulhaN = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0xC9A227, metalness: 0.5, roughness: 0.4 }));
+  bussola.add(agulhaN);
+  const agulhaS = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0x7A611A, metalness: 0.5, roughness: 0.4 }));
+  agulhaS.rotation.z = Math.PI;
+  bussola.add(agulhaS);
+  bussola.position.set(3.4, 1.1, -1.5);
+  bussola.rotation.x = 0.3;
+  scene.add(bussola);
+
+  let mouseX = 0, mouseY = 0, alvoX = 0, alvoY = 0;
+  function aoMoverMouse(e){
+    const r = header.getBoundingClientRect();
+    mouseX = ((e.clientX - r.left) / r.width - 0.5) * 2;
+    mouseY = ((e.clientY - r.top) / r.height - 0.5) * 2;
+  }
+  header.addEventListener('mousemove', aoMoverMouse);
+
+  function ajustarTamanho(){
+    const r = canvas.parentElement.getBoundingClientRect();
+    if(r.width === 0 || r.height === 0) return;
+    renderer.setSize(r.width, r.height, false);
+    camera.aspect = r.width / r.height;
+    camera.updateProjectionMatrix();
+  }
+  ajustarTamanho();
+  window.addEventListener('resize', ajustarTamanho);
+
+  const clock = new THREE.Clock();
+  function animar(){
+    voyage3D.raf = requestAnimationFrame(animar);
+    const t = clock.getElapsedTime();
+
+    for(let i = 0; i < oceanPos.count; i++){
+      const ix = oceanBase[i*3], iz = oceanBase[i*3 + 2];
+      oceanPos.setY(i, Math.sin(ix * 0.6 + t * 0.9) * 0.18 + Math.cos(iz * 0.5 + t * 0.7) * 0.12);
+    }
+    oceanPos.needsUpdate = true;
+
+    starMat.opacity = 0.55 + Math.sin(t * 1.4) * 0.25;
+    bussola.rotation.y = t * 0.35;
+    navio.position.y = -0.6 + Math.sin(t * 1.1) * 0.06;
+    navio.rotation.z = Math.sin(t * 0.8) * 0.05;
+
+    alvoX += (mouseX - alvoX) * 0.04;
+    alvoY += (mouseY - alvoY) * 0.04;
+    camera.position.x = alvoX * 0.8;
+    camera.position.y = 2.2 - alvoY * 0.4;
+    camera.lookAt(0, 0.5, 0);
+
+    renderer.render(scene, camera);
+  }
+
+  voyage3D = { renderer: renderer, raf: null, animar: animar };
+  animar();
+}
+
+function atualizarVoyageScene3D(ligar){
+  const canvas = document.getElementById('voyage-scene-3d');
+  if(!canvas) return;
+  if(!ligar){
+    canvas.style.display = 'none';
+    if(voyage3D && voyage3D.raf){ cancelAnimationFrame(voyage3D.raf); voyage3D.raf = null; }
+    return;
+  }
+  canvas.style.display = 'block';
+  if(!voyage3D) iniciarVoyageScene3D();
+  else if(!voyage3D.raf) voyage3D.animar();
 }
 
 function applyRolePermissions(){
@@ -2407,6 +2573,7 @@ function applyRolePermissions(){
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';
+  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg') : '';
   document.getElementById('btn-toggle-theme').style.display = isAdmin() ? '' : 'none';
   document.body.classList.toggle('theme-admin', isAdmin());
   syncThemeVisuals();

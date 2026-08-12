@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -82,6 +83,7 @@
       <rect x="357" y="58" width="3" height="60" fill="#0B0F17"/>
       <polygon points="360,61 360,106 393,101" fill="#16222E" opacity="0.9"/>
     </svg>
+    <canvas class="voyage-scene-3d" id="voyage-scene-3d" style="display:none;"></canvas>
     <div>
       <h1>Controle de processos</h1>
       <p>Abertura, vistoria e endereçamento — registro compartilhado da equipe</p>
@@ -93,6 +95,7 @@
         <polygon points="12,4 13.6,12 12,10.4 10.4,12" fill="currentColor" stroke="none"/>
         <polygon points="12,20 13.6,12 12,13.6 10.4,12" fill="currentColor" stroke="none" opacity="0.5"/>
       </svg>
+      <span id="user-avatar" class="user-avatar-wrap"></span>
       <span id="role-badge"></span>
       <span class="user-box-divider"></span>
       <div style="position:relative;">

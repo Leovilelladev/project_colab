@@ -179,8 +179,22 @@
   }
   thead th:hover{background:var(--blue-dark);}
   tbody td{padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:middle;}
-  tbody tr{transition:background 0.15s ease;}
+  @keyframes row-fade-in{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+  tbody tr{transition:background 0.15s ease; animation:row-fade-in 0.3s ease both;}
+  tbody tr:nth-child(1){animation-delay:0.00s;}
+  tbody tr:nth-child(2){animation-delay:0.02s;}
+  tbody tr:nth-child(3){animation-delay:0.04s;}
+  tbody tr:nth-child(4){animation-delay:0.06s;}
+  tbody tr:nth-child(5){animation-delay:0.08s;}
+  tbody tr:nth-child(6){animation-delay:0.10s;}
+  tbody tr:nth-child(7){animation-delay:0.12s;}
+  tbody tr:nth-child(8){animation-delay:0.14s;}
+  tbody tr:nth-child(9){animation-delay:0.16s;}
+  tbody tr:nth-child(10){animation-delay:0.18s;}
+  tbody tr:nth-child(n+11){animation-delay:0.20s;}
   tbody tr:hover{background:#fff;}
+  @keyframes loading-pulse{0%,100%{opacity:0.45;} 50%{opacity:1;}}
+  .loading-pulse{animation:loading-pulse 1.3s ease-in-out infinite;}
   body.compact-mode tbody td{padding:4px 10px; font-size:12px;}
   body.compact-mode thead th{padding:6px 10px;}
   body.compact-mode .stamp{padding:1px 6px; font-size:10px;}
@@ -194,7 +208,9 @@
     border:1px solid var(--line); border-radius:var(--radius);
     background:#fff; color:var(--ink-soft); cursor:pointer;
   }
+  .icon-btn{transition:color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;}
   .icon-btn:hover{color:var(--ink); border-color:var(--ink-soft);}
+  .icon-btn:active{transform:scale(0.88);}
   .empty-row td{text-align:center; padding:36px 12px; color:var(--ink-soft);}
 
   /* stamp badges */

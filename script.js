@@ -236,6 +236,22 @@ function render(){
   renderCharts();
 }
 
+let lastStats = {total:0, pendente:0, agendada:0, realizada:0};
+
+function animateNumber(el, to, from){
+  if(!el || from === to){ if(el) el.textContent = to; return; }
+  const duration = 400;
+  const start = performance.now();
+  function step(now){
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if(progress < 1) requestAnimationFrame(step);
+    else el.textContent = to;
+  }
+  requestAnimationFrame(step);
+}
+
 function renderStats(){
   const total = records.length;
   const pendente = records.filter(r=>r.vistoria==='pendente').length;
@@ -243,11 +259,17 @@ function renderStats(){
   const realizada = records.filter(r=>r.vistoria==='realizada').length;
   const statusAtivo = document.getElementById('f-status').value;
   document.getElementById('stats').innerHTML = `
-    <div class="stat stat-clickable stat-total ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${total}</span><span class="l">Total</span></div>
-    <div class="stat stat-clickable stat-pendente ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${pendente}</span><span class="l">Pendentes</span></div>
-    <div class="stat stat-clickable stat-agendada ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${agendada}</span><span class="l">Agendadas</span></div>
-    <div class="stat stat-clickable stat-realizada ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${realizada}</span><span class="l">Realizadas</span></div>
+    <div class="stat stat-clickable stat-total ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${lastStats.total}</span><span class="l">Total</span></div>
+    <div class="stat stat-clickable stat-pendente ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${lastStats.pendente}</span><span class="l">Pendentes</span></div>
+    <div class="stat stat-clickable stat-agendada ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${lastStats.agendada}</span><span class="l">Agendadas</span></div>
+    <div class="stat stat-clickable stat-realizada ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${lastStats.realizada}</span><span class="l">Realizadas</span></div>
   `;
+  const statEls = document.querySelectorAll('#stats .n');
+  animateNumber(statEls[0], total, lastStats.total);
+  animateNumber(statEls[1], pendente, lastStats.pendente);
+  animateNumber(statEls[2], agendada, lastStats.agendada);
+  animateNumber(statEls[3], realizada, lastStats.realizada);
+  lastStats = {total, pendente, agendada, realizada};
 }
 
 function filtrarPorStatusCard(status){
@@ -526,25 +548,25 @@ function renderCharts(){
   chartBairro = new Chart(document.getElementById('chart-bairro'), {
     type: 'bar',
     data: { labels: bairroEntries.map(e=>e[0]), datasets: [{ data: bairroEntries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
-    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartStatus = new Chart(document.getElementById('chart-status'), {
     type: 'doughnut',
     data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[byStatus.pendente, byStatus.agendada, byStatus.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
-    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false }
+    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartColab = new Chart(document.getElementById('chart-colab'), {
     type: 'bar',
     data: { labels: responsavelEntries.map(e=>e[0]), datasets: [{ data: responsavelEntries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
-    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartTipoServico = new Chart(document.getElementById('chart-tiposervico'), {
     type: 'doughnut',
     data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[byTipoServico.pavimentacao, byTipoServico.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
-    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false }
+    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 }
 
@@ -561,28 +583,28 @@ function ampliarGrafico(tipo){
     chartZoom = new Chart(ctx, {
       type: 'bar',
       data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
-      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'responsavel'){
     const entries = graficoDadosCache.responsavel || [];
     chartZoom = new Chart(ctx, {
       type: 'bar',
       data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
-      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'status'){
     const s = graficoDadosCache.status || {pendente:0, agendada:0, realizada:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
       data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[s.pendente, s.agendada, s.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
-      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false }
+      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'tiposervico'){
     const t = graficoDadosCache.tiposervico || {pavimentacao:0, obra_civil:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
       data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[t.pavimentacao, t.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
-      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false }
+      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   }
 }
@@ -1874,7 +1896,7 @@ function selecionarMencao(nome){
 async function abrirHistorico(){
   document.getElementById('historico-overlay').classList.add('open');
   const tbody = document.getElementById('historico-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>';
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_excluidos?select=*&order=deletado_em.desc', {
       headers: supaHeaders()

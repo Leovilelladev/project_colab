@@ -2863,12 +2863,32 @@ document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.
 
 /* ===== Relatório Mensal (Obra Civil) ===== */
 function abrirRelatorioMensal(){
-  document.getElementById('relatorio-responsavel').innerHTML = uniqueValues('responsavel').map(v=>`<option value="${escAttr(v)}">${escHtml(v)}</option>`).join('');
+  const nomes = uniqueValues('responsavel');
+  document.getElementById('relatorio-responsavel-lista').innerHTML = nomes.map(v => `
+    <label style="display:flex; align-items:center; gap:6px; padding:3px 0; cursor:pointer; font-size:13px;">
+      <input type="checkbox" class="relatorio-resp-check" value="${escAttr(v)}"> ${escHtml(v)}
+    </label>
+  `).join('') || '<span style="font-size:12px; color:var(--ink-soft);">Nenhum responsável cadastrado.</span>';
+  document.getElementById('relatorio-responsavel-todos').checked = false;
   document.getElementById('relatorio-data-inicio').value = '';
   document.getElementById('relatorio-data-fim').value = '';
   document.getElementById('relatorio-msg').textContent = '';
   document.getElementById('relatorio-overlay').classList.add('open');
 }
+
+function relatorioResponsaveisSelecionados(){
+  return [...document.querySelectorAll('.relatorio-resp-check:checked')].map(el => el.value);
+}
+
+document.getElementById('relatorio-responsavel-todos').addEventListener('change', (e)=>{
+  document.querySelectorAll('.relatorio-resp-check').forEach(el => { el.checked = e.target.checked; });
+});
+document.getElementById('relatorio-responsavel-lista').addEventListener('change', (e)=>{
+  if(!e.target.classList.contains('relatorio-resp-check')) return;
+  const todas = document.querySelectorAll('.relatorio-resp-check');
+  const marcadas = document.querySelectorAll('.relatorio-resp-check:checked');
+  document.getElementById('relatorio-responsavel-todos').checked = todas.length > 0 && todas.length === marcadas.length;
+});
 
 function formatarPeriodoRelatorio(dataInicio, dataFim){
   const [y1, m1, d1] = dataInicio.split('-').map(Number);
@@ -2881,14 +2901,16 @@ function formatarPeriodoRelatorio(dataInicio, dataFim){
   return `${d1} DE ${mes1} DE ${y1} A ${d2} DE ${mes2} DE ${y2}`;
 }
 
+function pausar(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
 async function gerarRelatorioMensal(){
   const msgEl = document.getElementById('relatorio-msg');
-  const responsavel = document.getElementById('relatorio-responsavel').value;
+  const responsaveis = relatorioResponsaveisSelecionados();
   const dataInicio = document.getElementById('relatorio-data-inicio').value;
   const dataFim = document.getElementById('relatorio-data-fim').value;
 
-  if(!responsavel || !dataInicio || !dataFim){
-    msgEl.textContent = 'Preencha o responsável e o período.';
+  if(responsaveis.length === 0 || !dataInicio || !dataFim){
+    msgEl.textContent = 'Marque ao menos um responsável e preencha o período.';
     return;
   }
   if(dataFim < dataInicio){
@@ -2896,47 +2918,65 @@ async function gerarRelatorioMensal(){
     return;
   }
 
-  const registros = records
-    .filter(r => r.responsavel === responsavel && r.tipoServico === 'obra_civil' && r.data >= dataInicio && r.data <= dataFim)
-    .sort((a,b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.processo).localeCompare(String(b.processo), 'pt-BR')));
-
-  if(registros.length === 0){
-    msgEl.textContent = 'Nenhum registro de Obra Civil encontrado para esse responsável e período.';
-    return;
-  }
-
-  msgEl.textContent = 'Gerando relatório…';
+  msgEl.textContent = 'Gerando relatório(s)…';
 
   try{
     const res = await fetch('templates/relatorio-mensal-obra-civil.docx');
     if(!res.ok) throw new Error('template não encontrado');
     const templateBuf = await res.arrayBuffer();
+    const periodo = formatarPeriodoRelatorio(dataInicio, dataFim);
 
-    const zip = new PizZip(templateBuf);
-    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+    let gerados = 0;
+    const semRegistros = [];
 
-    const realizados = registros.filter(r => r.vistoria === 'realizada');
+    for(const responsavel of responsaveis){
+      const registros = records
+        .filter(r => r.responsavel === responsavel && r.tipoServico === 'obra_civil' && r.data >= dataInicio && r.data <= dataFim)
+        .sort((a,b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.processo).localeCompare(String(b.processo), 'pt-BR')));
 
-    doc.render({
-      periodo: formatarPeriodoRelatorio(dataInicio, dataFim),
-      despachos: registros.map(r => ({ processo: r.processo })),
-      colabs: registros.map(r => ({ colab: r.colab })),
-      pares: registros.map(r => ({ processo: r.processo, colab: r.colab })),
-      enderecos: realizados.map(r => ({ endereco: r.endereco, bairro: r.bairro }))
-    });
+      if(registros.length === 0){
+        semRegistros.push(responsavel);
+        continue;
+      }
 
-    const blob = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Relatorio_${responsavel.replace(/\s+/g,'_')}_${dataInicio}_a_${dataFim}.docx`;
-    a.click();
-    URL.revokeObjectURL(url);
+      msgEl.textContent = `Gerando relatório de ${responsavel}… (${gerados + 1}/${responsaveis.length})`;
 
-    msgEl.textContent = '';
-    document.getElementById('relatorio-overlay').classList.remove('open');
+      const zip = new PizZip(templateBuf);
+      const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      const realizados = registros.filter(r => r.vistoria === 'realizada');
+
+      doc.render({
+        periodo,
+        despachos: registros.map(r => ({ processo: r.processo })),
+        colabs: registros.map(r => ({ colab: r.colab })),
+        pares: registros.map(r => ({ processo: r.processo, colab: r.colab })),
+        enderecos: realizados.map(r => ({ endereco: r.endereco, bairro: r.bairro }))
+      });
+
+      const blob = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Relatorio_${responsavel.replace(/\s+/g,'_')}_${dataInicio}_a_${dataFim}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      gerados++;
+
+      if(responsaveis.length > 1) await pausar(400);
+    }
+
+    if(gerados === 0){
+      msgEl.textContent = 'Nenhum registro de Obra Civil encontrado para os responsáveis e período marcados.';
+      return;
+    }
+
+    let resumo = gerados === 1 ? '1 relatório gerado.' : `${gerados} relatórios gerados.`;
+    if(semRegistros.length > 0){
+      resumo += ` Sem registros no período: ${semRegistros.join(', ')}.`;
+    }
+    msgEl.textContent = resumo;
   }catch(e){
-    msgEl.textContent = 'Não foi possível gerar o relatório. Tente novamente.';
+    msgEl.textContent = 'Não foi possível gerar o(s) relatório(s). Tente novamente.';
   }
 }
 

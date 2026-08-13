@@ -69,7 +69,7 @@
   .avatar-3d-sm{width:22px; height:22px; font-size:9px;}
   .avatar-3d-md{width:28px; height:28px; font-size:11px;}
   .avatar-3d-lg{width:26px; height:26px; font-size:10px;}
-  .avatar-3d-foto{object-fit:cover; background:var(--paper-2);}
+  .avatar-3d-foto{object-fit:cover; background:var(--paper-2); cursor:pointer;}
   #avatar-preview-wrap .avatar-3d{width:72px; height:72px; font-size:26px;}
   .user-avatar-wrap:empty{display:none;}
   @keyframes pulse-badge{0%,100%{transform:scale(1);} 50%{transform:scale(1.18);}}
@@ -321,6 +321,23 @@
     transition:transform 0.22s cubic-bezier(.2,.8,.2,1), opacity 0.2s ease;
   }
   .overlay.open .modal{transform:scale(1) translateY(0); opacity:1;}
+
+  .avatar-zoom-box{
+    position:relative; text-align:center;
+    transform:scale(0.9); opacity:0;
+    transition:transform 0.22s cubic-bezier(.2,.8,.2,1), opacity 0.2s ease;
+  }
+  .overlay.open .avatar-zoom-box{transform:scale(1); opacity:1;}
+  .avatar-zoom-box img{
+    max-width:min(80vw, 480px); max-height:80vh; display:block;
+    border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,0.5); object-fit:cover;
+  }
+  .avatar-zoom-nome{color:#fff; font-size:13px; margin-top:10px; text-shadow:0 1px 3px rgba(0,0,0,0.6);}
+  .avatar-zoom-close{
+    position:absolute; top:-14px; right:-14px; width:30px; height:30px; border-radius:50%;
+    background:#fff; color:var(--ink); border:none; font-size:18px; line-height:1; cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center;
+  }
 
   .floating-panel{
     display:flex; flex-direction:column;

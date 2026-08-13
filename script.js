@@ -190,11 +190,21 @@ function avatarMatiz(str){
 function avatarHtml(nome, tamanho, urlFoto){
   const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
   if(urlFoto){
-    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '">';
+    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '" onclick="event.stopPropagation(); abrirZoomAvatar(this.src, this.title);">';
   }
   const hue = avatarMatiz(nome);
   const iniciais = avatarIniciais(nome);
   return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
+}
+
+function abrirZoomAvatar(url, nome){
+  if(!url) return;
+  document.getElementById('avatar-zoom-img').src = url;
+  document.getElementById('avatar-zoom-nome').textContent = nome || '';
+  document.getElementById('avatar-zoom-overlay').classList.add('open');
+}
+function fecharZoomAvatar(){
+  document.getElementById('avatar-zoom-overlay').classList.remove('open');
 }
 
 function emptyStateRow(colspan, message){
@@ -2429,8 +2439,9 @@ popularBairros();
 
 function syncThemeVisuals(){
   const on = document.body.classList.contains('theme-admin');
-  document.getElementById('user-box-icon').style.display = on ? 'none' : '';
-  document.getElementById('user-box-icon-admin').style.display = on ? '' : 'none';
+  const temFoto = !!(currentUser && currentUser.avatarUrl);
+  document.getElementById('user-box-icon').style.display = (on || temFoto) ? 'none' : '';
+  document.getElementById('user-box-icon-admin').style.display = (on && !temFoto) ? '' : 'none';
   const usar3D = on && typeof THREE !== 'undefined';
   document.getElementById('voyage-scene').style.display = (on && !usar3D) ? 'block' : 'none';
   atualizarVoyageScene3D(usar3D);
@@ -2860,6 +2871,10 @@ document.getElementById('btn-cancelar-avatar').addEventListener('click', ()=> do
 document.getElementById('btn-salvar-avatar').addEventListener('click', salvarAvatar);
 document.getElementById('btn-remover-avatar').addEventListener('click', removerAvatar);
 document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-overlay') document.getElementById('avatar-overlay').classList.remove('open'); });
+
+document.getElementById('btn-fechar-zoom-avatar').addEventListener('click', fecharZoomAvatar);
+document.getElementById('avatar-zoom-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-zoom-overlay') fecharZoomAvatar(); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharZoomAvatar(); });
 
 /* ===== Relatório Mensal (Obra Civil) ===== */
 function abrirRelatorioMensal(){

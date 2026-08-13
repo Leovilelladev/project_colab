@@ -5,7 +5,7 @@ let accessToken = null;
 function canEdit(){ return currentRole === 'supervisor' || currentRole === 'admin'; }
 function isAdmin(){ return currentRole === 'admin'; }
 function roleLabel(){
-  return {admin:'Administrador', supervisor:'Supervisor', operador:'Operador'}[currentRole] || currentRole;
+  return cargoLabel(currentRole);
 }
 
 const SUPABASE_URL = 'https://amnnvhbwdfaeubdvtloz.supabase.co';
@@ -187,20 +187,29 @@ function avatarMatiz(str){
   for(let i = 0; i < s.length; i++){ hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
   return Math.abs(hash) % 360;
 }
-function avatarHtml(nome, tamanho, urlFoto){
+function cargoLabel(role){
+  return {admin:'Administrador', supervisor:'Supervisor', operador:'Operador'}[role] || role || '';
+}
+
+function avatarHtml(nome, tamanho, urlFoto, email, cargo){
   const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
   if(urlFoto){
-    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '" onclick="event.stopPropagation(); abrirZoomAvatar(this.src, this.title);">';
+    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '"' +
+      ' data-cargo="' + escAttr(cargo || '') + '" data-email="' + escAttr(email || '') + '"' +
+      ' onclick="event.stopPropagation(); abrirZoomAvatar(this.src, this.title, this.dataset.cargo, this.dataset.email);">';
   }
   const hue = avatarMatiz(nome);
   const iniciais = avatarIniciais(nome);
   return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
 }
 
-function abrirZoomAvatar(url, nome){
+function abrirZoomAvatar(url, nome, cargo, email){
   if(!url) return;
   document.getElementById('avatar-zoom-img').src = url;
   document.getElementById('avatar-zoom-nome').textContent = nome || '';
+  document.getElementById('avatar-zoom-cargo').textContent = cargoLabel(cargo) || 'Membro da equipe';
+  const qtd = email ? records.filter(r => r.criadoPor === email).length : 0;
+  document.getElementById('avatar-zoom-extra').textContent = email ? (qtd === 1 ? '1 registro cadastrado' : qtd + ' registros cadastrados') : '';
   document.getElementById('avatar-zoom-overlay').classList.add('open');
 }
 function fecharZoomAvatar(){
@@ -1334,18 +1343,20 @@ let chamadoAtualDados = null;
 
 async function buscarNomesEquipe(){
   try{
-    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome,avatar_url', { headers: supaHeaders() });
-    if(!res.ok) return { nomeDe: {}, fotoDe: {} };
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome,avatar_url,role', { headers: supaHeaders() });
+    if(!res.ok) return { nomeDe: {}, fotoDe: {}, cargoDe: {} };
     const perfis = await res.json();
     const nomeDe = {};
     const fotoDe = {};
+    const cargoDe = {};
     perfis.forEach(p => {
       if(!p.email) return;
       nomeDe[p.email] = p.nome || p.email;
       if(p.avatar_url) fotoDe[p.email] = p.avatar_url;
+      if(p.role) cargoDe[p.email] = p.role;
     });
-    return { nomeDe: nomeDe, fotoDe: fotoDe };
-  }catch(e){ return { nomeDe: {}, fotoDe: {} }; }
+    return { nomeDe: nomeDe, fotoDe: fotoDe, cargoDe: cargoDe };
+  }catch(e){ return { nomeDe: {}, fotoDe: {}, cargoDe: {} }; }
 }
 
 function mostrarChamadosView(view){
@@ -1583,7 +1594,7 @@ async function carregarMensagensChamado(chamadoId){
     const mensagens = await resMsgs.json();
     if(!chamado){ headerEl.innerHTML = ''; msgsEl.innerHTML = '<p>Chamado não encontrado.</p>'; return; }
     chamadoAtualDados = chamado;
-    const nomeDe = equipe.nomeDe, fotoDe = equipe.fotoDe;
+    const nomeDe = equipe.nomeDe, fotoDe = equipe.fotoDe, cargoDe = equipe.cargoDe;
 
     const statusLabelChamado = { aberto:'Aberto', em_andamento:'Em andamento', resolvido:'Resolvido' };
     const autor = chamado.criado_por ? (nomeDe[chamado.criado_por] || chamado.criado_por) : '—';
@@ -1609,7 +1620,7 @@ async function carregarMensagensChamado(chamadoId){
     } else {
       msgsEl.innerHTML = mensagens.map(m => {
         const autorMsg = m.autor ? (nomeDe[m.autor] || m.autor) : '—';
-        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm', m.autor ? fotoDe[m.autor] : null) +
+        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm', m.autor ? fotoDe[m.autor] : null, m.autor, m.autor ? cargoDe[m.autor] : null) +
           '<div class="chat-body"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
           '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
       }).join('');
@@ -1710,6 +1721,7 @@ function destacarMencoes(textoEscapado){
 let anotacoesCache = [];
 let anotacoesNomeDeCache = {};
 let anotacoesFotoDeCache = {};
+let anotacoesCargoDeCache = {};
 let anotacaoEditandoId = null;
 
 async function carregarAnotacoes(){
@@ -1723,6 +1735,7 @@ async function carregarAnotacoes(){
     anotacoesCache = await resAnot.json();
     anotacoesNomeDeCache = equipe.nomeDe;
     anotacoesFotoDeCache = equipe.fotoDe;
+    anotacoesCargoDeCache = equipe.cargoDe;
     anotacoesNomes = [...new Set(Object.values(equipe.nomeDe)), 'everyone'];
     renderAnotacoesLista();
   }catch(e){
@@ -1742,10 +1755,11 @@ function renderAnotacoesLista(){
   listaEl.innerHTML = anotacoesCache.map(a => {
     const autor = a.autor ? (anotacoesNomeDeCache[a.autor] || a.autor) : '—';
     const foto = a.autor ? anotacoesFotoDeCache[a.autor] : null;
+    const cargo = a.autor ? anotacoesCargoDeCache[a.autor] : null;
     const quandoTxt = new Date(a.criado_em).toLocaleString('pt-BR');
 
     if(a.id === anotacaoEditandoId){
-      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) + '<div class="chat-body">' +
+      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, a.autor, cargo) + '<div class="chat-body">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' +
         '<textarea id="anotacao-edit-input" rows="2" style="width:100%; font-family:\'IBM Plex Sans\', sans-serif; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink); box-sizing:border-box;">' + escHtml(a.mensagem) + '</textarea>' +
         '<div style="display:flex; gap:6px; margin-top:6px;">' +
@@ -1763,7 +1777,7 @@ function renderAnotacoesLista(){
         '</span>'
       : '';
     const msgHtml = destacarMencoes(escHtml(a.mensagem));
-    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) + '<div class="chat-body">' +
+    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, a.autor, cargo) + '<div class="chat-body">' +
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' + icones +
       '</div>' +
@@ -1864,7 +1878,8 @@ async function carregarNotaColab(){
     listaEl.innerHTML = notas.map(n => {
       const autor = n.autor ? (equipe.nomeDe[n.autor] || n.autor) : '—';
       const foto = n.autor ? equipe.fotoDe[n.autor] : null;
-      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm', foto) +
+      const cargo = n.autor ? equipe.cargoDe[n.autor] : null;
+      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, n.autor, cargo) +
         '<div class="chat-body"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
         '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
     }).join('');
@@ -2598,7 +2613,7 @@ function applyRolePermissions(){
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';
-  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg', currentUser.avatarUrl) : '';
+  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg', currentUser.avatarUrl, currentUser.email, currentRole) : '';
   document.getElementById('btn-toggle-theme').style.display = isAdmin() ? '' : 'none';
   document.body.classList.toggle('theme-admin', isAdmin());
   syncThemeVisuals();
@@ -2787,7 +2802,7 @@ function abrirAvatar(){
   avatarArquivoSelecionado = null;
   document.getElementById('avatar-file-input').value = '';
   document.getElementById('avatar-msg').textContent = '';
-  document.getElementById('avatar-preview-wrap').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'md', currentUser.avatarUrl) : '';
+  document.getElementById('avatar-preview-wrap').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'md', currentUser.avatarUrl, currentUser.email, currentRole) : '';
   document.getElementById('avatar-overlay').classList.add('open');
 }
 

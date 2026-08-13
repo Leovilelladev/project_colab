@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.69.3/build/docxtemplater.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -165,6 +167,7 @@
     <button class="secondary" id="btn-mapa">Ver mapa</button>
     <button class="secondary" id="btn-chamados">Chamados</button>
     <button class="secondary" id="btn-anotacoes">Anotações</button>
+    <button class="secondary" id="btn-relatorio-mensal" style="display:none;">Relatório Mensal</button>
     <span class="toolbar-divider"></span>
     <div style="position:relative;" id="admin-menu-wrap">
       <button class="secondary" id="btn-admin-menu">Admin ▾</button>
@@ -509,6 +512,30 @@
       <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-remover-aviso">Remover aviso atual</button>
       <button class="secondary" id="btn-cancelar-aviso">Cancelar</button>
       <button id="btn-enviar-aviso-form">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="relatorio-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h2>Relatório Mensal</h2>
+    <p style="font-size:12px; color:var(--ink-soft); margin:-6px 0 12px;">Gera o relatório de atividade de Obra Civil (Colabs respondidos e processos abertos) de um responsável, no período escolhido.</p>
+    <div class="field">
+      <label>Responsável</label>
+      <select id="relatorio-responsavel"></select>
+    </div>
+    <div class="field">
+      <label>De</label>
+      <input type="date" id="relatorio-data-inicio">
+    </div>
+    <div class="field">
+      <label>Até</label>
+      <input type="date" id="relatorio-data-fim">
+    </div>
+    <div class="status-msg" id="relatorio-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-relatorio">Cancelar</button>
+      <button id="btn-gerar-relatorio">Gerar relatório</button>
     </div>
   </div>
 </div>

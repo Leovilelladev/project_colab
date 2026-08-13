@@ -2583,6 +2583,7 @@ function atualizarVoyageScene3D(ligar){
 
 function applyRolePermissions(){
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
+  document.getElementById('btn-relatorio-mensal').style.display = canEdit() ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';
@@ -2859,6 +2860,90 @@ document.getElementById('btn-cancelar-avatar').addEventListener('click', ()=> do
 document.getElementById('btn-salvar-avatar').addEventListener('click', salvarAvatar);
 document.getElementById('btn-remover-avatar').addEventListener('click', removerAvatar);
 document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-overlay') document.getElementById('avatar-overlay').classList.remove('open'); });
+
+/* ===== Relatório Mensal (Obra Civil) ===== */
+function abrirRelatorioMensal(){
+  document.getElementById('relatorio-responsavel').innerHTML = uniqueValues('responsavel').map(v=>`<option value="${escAttr(v)}">${escHtml(v)}</option>`).join('');
+  document.getElementById('relatorio-data-inicio').value = '';
+  document.getElementById('relatorio-data-fim').value = '';
+  document.getElementById('relatorio-msg').textContent = '';
+  document.getElementById('relatorio-overlay').classList.add('open');
+}
+
+function formatarPeriodoRelatorio(dataInicio, dataFim){
+  const [y1, m1, d1] = dataInicio.split('-').map(Number);
+  const [y2, m2, d2] = dataFim.split('-').map(Number);
+  const mes1 = DP_MONTH_NAMES[m1 - 1].toUpperCase();
+  const mes2 = DP_MONTH_NAMES[m2 - 1].toUpperCase();
+  if(y1 === y2){
+    return `${d1} DE ${mes1} A ${d2} DE ${mes2} DE ${y2}`;
+  }
+  return `${d1} DE ${mes1} DE ${y1} A ${d2} DE ${mes2} DE ${y2}`;
+}
+
+async function gerarRelatorioMensal(){
+  const msgEl = document.getElementById('relatorio-msg');
+  const responsavel = document.getElementById('relatorio-responsavel').value;
+  const dataInicio = document.getElementById('relatorio-data-inicio').value;
+  const dataFim = document.getElementById('relatorio-data-fim').value;
+
+  if(!responsavel || !dataInicio || !dataFim){
+    msgEl.textContent = 'Preencha o responsável e o período.';
+    return;
+  }
+  if(dataFim < dataInicio){
+    msgEl.textContent = 'A data final não pode ser antes da data inicial.';
+    return;
+  }
+
+  const registros = records
+    .filter(r => r.responsavel === responsavel && r.tipoServico === 'obra_civil' && r.data >= dataInicio && r.data <= dataFim)
+    .sort((a,b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.processo).localeCompare(String(b.processo), 'pt-BR')));
+
+  if(registros.length === 0){
+    msgEl.textContent = 'Nenhum registro de Obra Civil encontrado para esse responsável e período.';
+    return;
+  }
+
+  msgEl.textContent = 'Gerando relatório…';
+
+  try{
+    const res = await fetch('templates/relatorio-mensal-obra-civil.docx');
+    if(!res.ok) throw new Error('template não encontrado');
+    const templateBuf = await res.arrayBuffer();
+
+    const zip = new PizZip(templateBuf);
+    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+    const realizados = registros.filter(r => r.vistoria === 'realizada');
+
+    doc.render({
+      periodo: formatarPeriodoRelatorio(dataInicio, dataFim),
+      despachos: registros.map(r => ({ processo: r.processo })),
+      colabs: registros.map(r => ({ colab: r.colab })),
+      pares: registros.map(r => ({ processo: r.processo, colab: r.colab })),
+      enderecos: realizados.map(r => ({ endereco: r.endereco, bairro: r.bairro }))
+    });
+
+    const blob = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Relatorio_${responsavel.replace(/\s+/g,'_')}_${dataInicio}_a_${dataFim}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    msgEl.textContent = '';
+    document.getElementById('relatorio-overlay').classList.remove('open');
+  }catch(e){
+    msgEl.textContent = 'Não foi possível gerar o relatório. Tente novamente.';
+  }
+}
+
+document.getElementById('btn-relatorio-mensal').addEventListener('click', (e)=>{ e.preventDefault(); abrirRelatorioMensal(); });
+document.getElementById('btn-cancelar-relatorio').addEventListener('click', ()=> document.getElementById('relatorio-overlay').classList.remove('open'));
+document.getElementById('btn-gerar-relatorio').addEventListener('click', gerarRelatorioMensal);
+document.getElementById('relatorio-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'relatorio-overlay') document.getElementById('relatorio-overlay').classList.remove('open'); });
 
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });

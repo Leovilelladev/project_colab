@@ -2609,7 +2609,7 @@ function atualizarVoyageScene3D(ligar){
 
 function applyRolePermissions(){
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
-  document.getElementById('btn-relatorio-mensal').style.display = canEdit() ? '' : 'none';
+  document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';

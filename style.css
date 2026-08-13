@@ -397,13 +397,23 @@
     border-bottom:2px solid var(--ink); padding-bottom:10px;
   }
   .field{margin-bottom:12px;}
-  .field label{display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.3px;}
-  .field input, .field select{
+  .field label:not(.chip-check){display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.3px;}
+  .field input:not([type="checkbox"]), .field select{
     width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius);
     font-family:'IBM Plex Sans', sans-serif; font-size:13px; background:#fff; color:var(--ink);
   }
   .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px;}
   .status-msg{font-size:12px; color:var(--ink-soft); margin-top:10px; min-height:16px;}
+
+  .chip-list{display:flex; flex-wrap:wrap; gap:8px; padding:10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper);}
+  .chip-check{
+    display:inline-flex; align-items:center; gap:6px; padding:6px 12px 6px 8px;
+    border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--ink);
+    font-size:12px; font-weight:600; cursor:pointer; user-select:none; transition:background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .chip-check input{width:auto; margin:0; accent-color:var(--ink); cursor:pointer;}
+  .chip-check.selected{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .chip-check:hover{border-color:var(--ink);}
   .footnote{font-size:11px; color:var(--ink-soft); text-align:center; margin-top:6px;}
 
   @media (max-width:760px){

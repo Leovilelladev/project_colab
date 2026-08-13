@@ -2865,11 +2865,12 @@ document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.
 function abrirRelatorioMensal(){
   const nomes = uniqueValues('responsavel');
   document.getElementById('relatorio-responsavel-lista').innerHTML = nomes.map(v => `
-    <label style="display:flex; align-items:center; gap:6px; padding:3px 0; cursor:pointer; font-size:13px;">
+    <label class="chip-check">
       <input type="checkbox" class="relatorio-resp-check" value="${escAttr(v)}"> ${escHtml(v)}
     </label>
   `).join('') || '<span style="font-size:12px; color:var(--ink-soft);">Nenhum responsável cadastrado.</span>';
   document.getElementById('relatorio-responsavel-todos').checked = false;
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.remove('selected');
   document.getElementById('relatorio-data-inicio').value = '';
   document.getElementById('relatorio-data-fim').value = '';
   document.getElementById('relatorio-msg').textContent = '';
@@ -2881,13 +2882,20 @@ function relatorioResponsaveisSelecionados(){
 }
 
 document.getElementById('relatorio-responsavel-todos').addEventListener('change', (e)=>{
-  document.querySelectorAll('.relatorio-resp-check').forEach(el => { el.checked = e.target.checked; });
+  document.querySelectorAll('.relatorio-resp-check').forEach(el => {
+    el.checked = e.target.checked;
+    el.closest('.chip-check').classList.toggle('selected', e.target.checked);
+  });
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', e.target.checked);
 });
 document.getElementById('relatorio-responsavel-lista').addEventListener('change', (e)=>{
   if(!e.target.classList.contains('relatorio-resp-check')) return;
+  e.target.closest('.chip-check').classList.toggle('selected', e.target.checked);
   const todas = document.querySelectorAll('.relatorio-resp-check');
   const marcadas = document.querySelectorAll('.relatorio-resp-check:checked');
-  document.getElementById('relatorio-responsavel-todos').checked = todas.length > 0 && todas.length === marcadas.length;
+  const todasMarcadas = todas.length > 0 && todas.length === marcadas.length;
+  document.getElementById('relatorio-responsavel-todos').checked = todasMarcadas;
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', todasMarcadas);
 });
 
 function formatarPeriodoRelatorio(dataInicio, dataFim){

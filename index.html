@@ -2,8 +2,15 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16233A">
 <title>Controle de Processos</title>
-<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2316233A'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='%23F7F5EF' font-family='monospace'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="icon" id="favicon" type="image/png" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Processos">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet">
@@ -14,6 +21,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.69.3/build/docxtemplater.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -82,6 +92,7 @@
       <rect x="357" y="58" width="3" height="60" fill="#0B0F17"/>
       <polygon points="360,61 360,106 393,101" fill="#16222E" opacity="0.9"/>
     </svg>
+    <canvas class="voyage-scene-3d" id="voyage-scene-3d" style="display:none;"></canvas>
     <div>
       <h1>Controle de processos</h1>
       <p>Abertura, vistoria e endereçamento — registro compartilhado da equipe</p>
@@ -93,6 +104,7 @@
         <polygon points="12,4 13.6,12 12,10.4 10.4,12" fill="currentColor" stroke="none"/>
         <polygon points="12,20 13.6,12 12,13.6 10.4,12" fill="currentColor" stroke="none" opacity="0.5"/>
       </svg>
+      <span id="user-avatar" class="user-avatar-wrap"></span>
       <span id="role-badge"></span>
       <span class="user-box-divider"></span>
       <div style="position:relative;">
@@ -105,6 +117,9 @@
       <span class="user-box-divider"></span>
       <button type="button" class="icon-btn" id="btn-toggle-theme" title="Alternar tema" aria-label="Alternar tema" style="display:none;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.4 5.4 0 0 1-7.54-7.54A9 9 0 0 0 12 3z"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-open-avatar" title="Trocar foto de perfil" aria-label="Trocar foto de perfil">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
       </button>
       <button type="button" class="icon-btn" id="btn-open-senha" title="Trocar senha" aria-label="Trocar senha">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4"/><path d="M16 7l3 3"/><path d="M13 10l2.5 2.5"/></svg>
@@ -155,9 +170,12 @@
         <button class="secondary" id="btn-import">Importar CSV</button>
       </div>
     </div>
+    <span class="toolbar-divider"></span>
     <button class="secondary" id="btn-mapa">Ver mapa</button>
     <button class="secondary" id="btn-chamados">Chamados</button>
     <button class="secondary" id="btn-anotacoes">Anotações</button>
+    <button class="secondary" id="btn-relatorio-mensal" style="display:none;">Relatório Mensal</button>
+    <span class="toolbar-divider"></span>
     <div style="position:relative;" id="admin-menu-wrap">
       <button class="secondary" id="btn-admin-menu">Admin ▾</button>
       <div class="admin-dropdown" id="admin-dropdown">
@@ -175,6 +193,7 @@
         <button class="secondary" id="btn-abrir-aviso">Enviar aviso</button>
       </div>
     </div>
+    <span class="toolbar-divider"></span>
         <button id="btn-novo">+ Novo registro</button>
   </div>
 
@@ -219,6 +238,7 @@
       <option value="realizada">Realizada</option>
     </select>
     <button class="secondary" id="btn-bulk-apply-status">Aplicar</button>
+    <button class="secondary" id="btn-bulk-nota">Adicionar anotação</button>
     <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-bulk-delete">Excluir selecionados</button>
     <button class="secondary" id="btn-bulk-clear">Limpar seleção</button>
   </div>
@@ -241,7 +261,7 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr class="empty-row"><td colspan="10">Carregando registros…</td></tr>
+        <tr class="empty-row"><td colspan="10" class="loading-pulse">Carregando registros…</td></tr>
       </tbody>
     </table>
     </div>
@@ -367,7 +387,7 @@
         </tr>
       </thead>
       <tbody id="atividade-tbody">
-        <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
+        <tr><td colspan="4" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -476,7 +496,7 @@
           </tr>
         </thead>
         <tbody id="historico-tbody">
-          <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
+          <tr><td colspan="6" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>
         </tbody>
       </table>
     </div>
@@ -500,6 +520,84 @@
       <button class="secondary" style="border-color:var(--red); color:var(--red-dark);" id="btn-remover-aviso">Remover aviso atual</button>
       <button class="secondary" id="btn-cancelar-aviso">Cancelar</button>
       <button id="btn-enviar-aviso-form">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="relatorio-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h2>Relatório Mensal</h2>
+    <p style="font-size:12px; color:var(--ink-soft); margin:-6px 0 12px;">Gera o relatório de atividade de Obra Civil (Colabs respondidos e processos abertos) de um ou mais responsáveis, no período escolhido. Um arquivo .docx é gerado para cada responsável marcado.</p>
+    <div class="field">
+      <label>Responsável(is)</label>
+      <label class="chip-check" id="relatorio-responsavel-todos-wrap" style="margin-bottom:8px; border-style:dashed;">
+        <input type="checkbox" id="relatorio-responsavel-todos"> Selecionar todos
+      </label>
+      <div id="relatorio-responsavel-lista" class="chip-list" style="max-height:180px; overflow-y:auto;"></div>
+    </div>
+    <div class="field">
+      <label>De</label>
+      <input type="date" id="relatorio-data-inicio">
+    </div>
+    <div class="field">
+      <label>Até</label>
+      <input type="date" id="relatorio-data-fim">
+    </div>
+    <div class="status-msg" id="relatorio-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-relatorio">Cancelar</button>
+      <button id="btn-gerar-relatorio">Gerar relatório</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="avatar-overlay">
+  <div class="modal" style="max-width:360px;">
+    <h2>Minha foto de perfil</h2>
+    <div style="display:flex; justify-content:center; margin:6px 0 14px;">
+      <span id="avatar-preview-wrap"></span>
+    </div>
+    <div class="field">
+      <label>Escolher foto ou GIF (máx. 3 MB)</label>
+      <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif">
+    </div>
+    <div class="status-msg" id="avatar-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-remover-avatar">Remover foto</button>
+      <button class="secondary" id="btn-cancelar-avatar">Cancelar</button>
+      <button id="btn-salvar-avatar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="bulk-nota-overlay">
+  <div class="modal" style="max-width:400px;">
+    <h2>Adicionar anotação</h2>
+    <p style="font-size:12px; color:var(--ink-soft); margin:-6px 0 12px;" id="bulk-nota-contagem"></p>
+    <div class="field">
+      <label>Anotação</label>
+      <textarea id="bulk-nota-texto" rows="4" placeholder="Escreva a anotação que será adicionada a todos os registros selecionados..." style="width:100%; font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink); box-sizing:border-box; resize:vertical;"></textarea>
+    </div>
+    <div class="status-msg" id="bulk-nota-msg"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="btn-cancelar-bulk-nota">Cancelar</button>
+      <button id="btn-enviar-bulk-nota">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="avatar-zoom-overlay">
+  <div class="avatar-zoom-card">
+    <button type="button" class="avatar-zoom-close" id="btn-fechar-zoom-avatar" aria-label="Fechar">&times;</button>
+    <div class="avatar-zoom-info">
+      <span class="avatar-zoom-tag">Perfil</span>
+      <h3 id="avatar-zoom-nome"></h3>
+      <span class="avatar-zoom-tag">Cargo</span>
+      <p id="avatar-zoom-cargo"></p>
+      <p class="avatar-zoom-extra" id="avatar-zoom-extra"></p>
+    </div>
+    <div class="avatar-zoom-photo">
+      <img id="avatar-zoom-img" src="" alt="">
     </div>
   </div>
 </div>
@@ -541,11 +639,16 @@
 
 <div class="overlay" id="mapa-overlay">
   <div class="modal" style="max-width:min(1000px, 94vw); width:94vw; height:88vh; display:flex; flex-direction:column; padding:16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
       <h2 style="border:none; margin:0;">Mapa dos registros</h2>
-      <button class="secondary" id="btn-fechar-mapa">Fechar</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="secondary" id="btn-rota-proximidade">Rota por proximidade</button>
+        <button class="secondary" id="btn-toggle-rota-lista" style="display:none;">Ver lista</button>
+        <button class="secondary" id="btn-limpar-rota" style="display:none;">Limpar rota</button>
+        <button class="secondary" id="btn-fechar-mapa">Fechar</button>
+      </div>
     </div>
-    <p style="margin:0 0 8px; font-size:12px; color:var(--ink-soft);">Mostra os registros com endereço já geocodificado, respeitando os filtros ativos.</p>
+    <p style="margin:0 0 8px; font-size:12px; color:var(--ink-soft);">Mostra os registros com endereço já geocodificado, respeitando os filtros ativos. "Rota por proximidade" ordena as vistorias <b>agendadas</b> visíveis pelo caminho mais curto estimado entre elas.</p>
     <div style="position:relative; flex:1;">
       <div id="mapa-container" style="position:absolute; inset:0; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);"></div>
       <div id="mapa-legenda" style="position:absolute; bottom:10px; left:10px; z-index:1000; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px; font-size:12px; box-shadow:0 2px 8px rgba(22,35,58,0.15);">
@@ -553,11 +656,27 @@
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:10px; height:10px; border-radius:50%; background:#3B6E92; display:inline-block;"></span> Agendada</div>
         <div style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:50%; background:#4B7A5D; display:inline-block;"></span> Realizada</div>
       </div>
+      <div id="mapa-rota-painel" style="display:none; position:absolute; top:10px; right:10px; z-index:1000; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; font-size:12px; box-shadow:0 2px 8px rgba(22,35,58,0.15); max-width:260px; max-height:calc(100% - 20px); overflow-y:auto;">
+        <b style="display:block; margin-bottom:6px;">Rota sugerida</b>
+        <ol id="mapa-rota-lista" style="margin:0; padding-left:18px;"></ol>
+      </div>
     </div>
     <div class="status-msg" id="mapa-status"></div>
   </div>
 </div>
 
+<div id="sync-pendente-badge" onclick="tentarReenviarPendentes();">
+  <span class="sync-pendente-icone">&#8635;</span>
+  <span id="sync-pendente-texto"></span>
+</div>
+
 <script src="script.js"></script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

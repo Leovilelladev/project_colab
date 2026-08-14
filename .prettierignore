@@ -1,0 +1,5 @@
+node_modules
+templates/*.docx
+icons/*.png
+*.pdf
+*.xlsx

@@ -5,7 +5,7 @@ let accessToken = null;
 function canEdit(){ return currentRole === 'supervisor' || currentRole === 'admin'; }
 function isAdmin(){ return currentRole === 'admin'; }
 function roleLabel(){
-  return {admin:'Administrador', supervisor:'Supervisor', operador:'Operador'}[currentRole] || currentRole;
+  return cargoLabel(currentRole);
 }
 
 const SUPABASE_URL = 'https://amnnvhbwdfaeubdvtloz.supabase.co';
@@ -44,13 +44,63 @@ function supaHeaders(extra){
 }
 
 async function supaFetch(url, options){
-  const res = await fetch(url, options);
+  const isWrite = !!(options && options.method && options.method !== 'GET');
+  let res;
+  try{
+    res = await fetch(url, options);
+  }catch(err){
+    if(isWrite) registrarAlteracaoPendente(url, options);
+    throw err;
+  }
   if(res.status === 401){
     handleSessionExpired();
     throw new Error('Sessão expirada');
   }
   return res;
 }
+
+let alteracoesPendentes = [];
+
+function registrarAlteracaoPendente(url, options){
+  alteracoesPendentes.push({ url: url, options: options });
+  atualizarBadgePendente();
+}
+
+function atualizarBadgePendente(){
+  const badge = document.getElementById('sync-pendente-badge');
+  if(!badge) return;
+  const n = alteracoesPendentes.length;
+  if(n > 0){
+    badge.style.display = 'flex';
+    document.getElementById('sync-pendente-texto').textContent =
+      (n === 1 ? '1 alteração pendente de envio' : n + ' alterações pendentes de envio');
+  }else{
+    badge.style.display = 'none';
+  }
+}
+
+async function tentarReenviarPendentes(){
+  if(alteracoesPendentes.length === 0) return;
+  const badge = document.getElementById('sync-pendente-badge');
+  if(badge) badge.classList.add('sync-tentando');
+  const fila = alteracoesPendentes;
+  alteracoesPendentes = [];
+  let falharam = 0;
+  for(const item of fila){
+    try{
+      const res = await fetch(item.url, item.options);
+      if(!res.ok && res.status !== 401) falharam++, alteracoesPendentes.push(item);
+    }catch(e){
+      falharam++;
+      alteracoesPendentes.push(item);
+    }
+  }
+  if(badge) badge.classList.remove('sync-tentando');
+  atualizarBadgePendente();
+  if(falharam === 0 && fila.length > 0) loadRecords(true);
+}
+
+window.addEventListener('online', tentarReenviarPendentes);
 
 function handleSessionExpired(){
   currentRole = null;
@@ -174,6 +224,48 @@ function populateFilterOptions(){
 function escHtml(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function escAttr(s){ return escHtml(s); }
 
+/* ===== Avatares gerados (iniciais + cor determinística) ===== */
+function avatarIniciais(nome){
+  const partes = String(nome ?? '').trim().split(/\s+/).filter(Boolean);
+  if(partes.length === 0) return '?';
+  if(partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+function avatarMatiz(str){
+  let hash = 0;
+  const s = String(str ?? '?');
+  for(let i = 0; i < s.length; i++){ hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
+  return Math.abs(hash) % 360;
+}
+function cargoLabel(role){
+  return {admin:'Administrador', supervisor:'Supervisor', operador:'Operador'}[role] || role || '';
+}
+
+function avatarHtml(nome, tamanho, urlFoto, email, cargo){
+  const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
+  if(urlFoto){
+    return '<img class="' + cls + ' avatar-3d-foto" src="' + escAttr(urlFoto) + '" alt="" title="' + escAttr(nome || '') + '"' +
+      ' data-cargo="' + escAttr(cargo || '') + '" data-email="' + escAttr(email || '') + '"' +
+      ' onclick="event.stopPropagation(); abrirZoomAvatar(this.src, this.title, this.dataset.cargo, this.dataset.email);">';
+  }
+  const hue = avatarMatiz(nome);
+  const iniciais = avatarIniciais(nome);
+  return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
+}
+
+function abrirZoomAvatar(url, nome, cargo, email){
+  if(!url) return;
+  document.getElementById('avatar-zoom-img').src = url;
+  document.getElementById('avatar-zoom-nome').textContent = nome || '';
+  document.getElementById('avatar-zoom-cargo').textContent = cargoLabel(cargo) || 'Membro da equipe';
+  const qtd = email ? records.filter(r => r.criadoPor === email).length : 0;
+  document.getElementById('avatar-zoom-extra').textContent = email ? (qtd === 1 ? '1 registro cadastrado' : qtd + ' registros cadastrados') : '';
+  document.getElementById('avatar-zoom-overlay').classList.add('open');
+}
+function fecharZoomAvatar(){
+  document.getElementById('avatar-zoom-overlay').classList.remove('open');
+}
+
 function emptyStateRow(colspan, message){
   if(!document.body.classList.contains('theme-admin')){
     return '<tr class="empty-row"><td colspan="' + colspan + '">' + message + '</td></tr>';
@@ -236,6 +328,22 @@ function render(){
   renderCharts();
 }
 
+let lastStats = {total:0, pendente:0, agendada:0, realizada:0};
+
+function animateNumber(el, to, from){
+  if(!el || from === to){ if(el) el.textContent = to; return; }
+  const duration = 400;
+  const start = performance.now();
+  function step(now){
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if(progress < 1) requestAnimationFrame(step);
+    else el.textContent = to;
+  }
+  requestAnimationFrame(step);
+}
+
 function renderStats(){
   const total = records.length;
   const pendente = records.filter(r=>r.vistoria==='pendente').length;
@@ -243,11 +351,17 @@ function renderStats(){
   const realizada = records.filter(r=>r.vistoria==='realizada').length;
   const statusAtivo = document.getElementById('f-status').value;
   document.getElementById('stats').innerHTML = `
-    <div class="stat stat-clickable ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${total}</span><span class="l">Total</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${pendente}</span><span class="l">Pendentes</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${agendada}</span><span class="l">Agendadas</span></div>
-    <div class="stat stat-clickable ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${realizada}</span><span class="l">Realizadas</span></div>
+    <div class="stat stat-clickable stat-total ${statusAtivo === '' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('')"><span class="n">${lastStats.total}</span><span class="l">Total</span></div>
+    <div class="stat stat-clickable stat-pendente ${statusAtivo === 'pendente' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('pendente')"><span class="n">${lastStats.pendente}</span><span class="l">Pendentes</span></div>
+    <div class="stat stat-clickable stat-agendada ${statusAtivo === 'agendada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('agendada')"><span class="n">${lastStats.agendada}</span><span class="l">Agendadas</span></div>
+    <div class="stat stat-clickable stat-realizada ${statusAtivo === 'realizada' ? 'stat-active' : ''}" onclick="filtrarPorStatusCard('realizada')"><span class="n">${lastStats.realizada}</span><span class="l">Realizadas</span></div>
   `;
+  const statEls = document.querySelectorAll('#stats .n');
+  animateNumber(statEls[0], total, lastStats.total);
+  animateNumber(statEls[1], pendente, lastStats.pendente);
+  animateNumber(statEls[2], agendada, lastStats.agendada);
+  animateNumber(statEls[3], realizada, lastStats.realizada);
+  lastStats = {total, pendente, agendada, realizada};
 }
 
 function filtrarPorStatusCard(status){
@@ -271,16 +385,19 @@ function renderTable(){
   } else {
     tbody.innerHTML = pageItems.map(r => `
       <tr title="${escAttr(rowAuditTitle(r))}" class="row-clickable" onclick="cliqueNaLinha(event, '${r.id}', '${escAttr(r.colab)}')">
-        <td style="text-align:center;"><input type="checkbox" class="row-checkbox" data-id="${escAttr(r.id)}" ${selectedIds.has(r.id) ? 'checked' : ''}></td>
-        <td>${escHtml(r.colab)}</td>
-        <td>${escHtml(r.responsavel)}</td>
-        <td><span class="stamp ${r.tipoServico}">${tipoServicoLabel(r.tipoServico)}</span></td>
-        <td class="mono">${escHtml(r.processo)}</td>
-        <td><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span></td>
-        <td class="mono">${formatDate(r.data)}</td>
-        <td>${escHtml(r.endereco)}</td>
-        <td>${escHtml(r.bairro)}</td>
-        <td class="actions">${canEdit() ? `
+        <td style="text-align:center;" data-label=""><input type="checkbox" class="row-checkbox" data-id="${escAttr(r.id)}" ${selectedIds.has(r.id) ? 'checked' : ''}></td>
+        <td data-label="Colab">${escHtml(r.colab)}</td>
+        <td data-label="Responsável">${escHtml(r.responsavel)}</td>
+        <td data-label="Tipo de Serviço"><span class="stamp ${r.tipoServico}">${tipoServicoLabel(r.tipoServico)}</span></td>
+        <td class="mono" data-label="Processo">${escHtml(r.processo)}</td>
+        <td data-label="Vistoria"><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span>${(() => {
+          const atraso = calcularAtrasoSLA(r);
+          return atraso ? ` <span class="sla-alerta" title="${atraso.dias} dia(s) em ${statusLabel(r.vistoria)} — prazo esperado: ${atraso.limite} dia(s)">⚠</span>` : '';
+        })()}</td>
+        <td class="mono" data-label="Data">${formatDate(r.data)}</td>
+        <td data-label="Endereço">${escHtml(r.endereco)}</td>
+        <td data-label="Bairro">${escHtml(r.bairro)}</td>
+        <td class="actions" data-label="">${canEdit() ? `
           <button class="icon-btn" onclick="openEdit('${r.id}')" title="Editar" aria-label="Editar">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
           </button>
@@ -303,6 +420,17 @@ function renderTable(){
 
 function statusLabel(s){
   return {pendente:'Pendente', agendada:'Agendada', realizada:'Realizada'}[s] || s || '—';
+}
+
+/* Prazo esperado (em dias) pra cada status sair do lugar antes de virar "atrasado" na tabela. */
+const SLA_DIAS = { pendente: 5, agendada: 30 };
+
+function calcularAtrasoSLA(r){
+  const limite = SLA_DIAS[r.vistoria];
+  if(!limite || !r.data) return null;
+  const dias = Math.floor((Date.now() - new Date(r.data + 'T00:00:00').getTime()) / 86400000);
+  if(dias <= limite) return null;
+  return { dias, limite };
 }
 function tipoServicoLabel(s){
   return {pavimentacao:'Pavimentação', obra_civil:'Obra Civil'}[s] || s || '—';
@@ -526,25 +654,25 @@ function renderCharts(){
   chartBairro = new Chart(document.getElementById('chart-bairro'), {
     type: 'bar',
     data: { labels: bairroEntries.map(e=>e[0]), datasets: [{ data: bairroEntries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
-    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartStatus = new Chart(document.getElementById('chart-status'), {
     type: 'doughnut',
     data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[byStatus.pendente, byStatus.agendada, byStatus.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
-    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false }
+    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartColab = new Chart(document.getElementById('chart-colab'), {
     type: 'bar',
     data: { labels: responsavelEntries.map(e=>e[0]), datasets: [{ data: responsavelEntries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
-    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartTipoServico = new Chart(document.getElementById('chart-tiposervico'), {
     type: 'doughnut',
     data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[byTipoServico.pavimentacao, byTipoServico.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
-    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false }
+    options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 }
 
@@ -561,28 +689,28 @@ function ampliarGrafico(tipo){
     chartZoom = new Chart(ctx, {
       type: 'bar',
       data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
-      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'responsavel'){
     const entries = graficoDadosCache.responsavel || [];
     chartZoom = new Chart(ctx, {
       type: 'bar',
       data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
-      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false }
+      options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'status'){
     const s = graficoDadosCache.status || {pendente:0, agendada:0, realizada:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
       data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[s.pendente, s.agendada, s.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
-      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false }
+      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'tiposervico'){
     const t = graficoDadosCache.tiposervico || {pavimentacao:0, obra_civil:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
       data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[t.pavimentacao, t.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
-      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false }
+      options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   }
 }
@@ -742,16 +870,16 @@ async function fetchExistingColabSet(){
 
 async function fetchColabIdMap(){
   try{
-    const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=id,colab', { headers: supaHeaders() });
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=id,colab,vistoria', { headers: supaHeaders() });
     if(!res.ok) throw new Error('fail');
     const data = await res.json();
-    const map = {};
-    data.forEach(r => { if(r.colab) map[normalizeColab(r.colab)] = r.id; });
-    return map;
+    const idDe = {}, vistoriaDe = {};
+    data.forEach(r => { if(r.colab){ const k = normalizeColab(r.colab); idDe[k] = r.id; vistoriaDe[k] = r.vistoria; } });
+    return { idDe, vistoriaDe };
   }catch(e){
-    const map = {};
-    records.forEach(r => { if(r.colab) map[normalizeColab(r.colab)] = r.id; });
-    return map;
+    const idDe = {}, vistoriaDe = {};
+    records.forEach(r => { if(r.colab){ const k = normalizeColab(r.colab); idDe[k] = r.id; vistoriaDe[k] = r.vistoria; } });
+    return { idDe, vistoriaDe };
   }
 }
 
@@ -878,7 +1006,7 @@ async function mostrarPreviaImportacao(parsed, unrecognized){
     : '<div style="background:rgba(75,122,93,0.08); border:1px solid var(--green); border-radius:var(--radius); padding:10px 12px; margin-bottom:12px; font-size:13px; color:var(--green-dark);">Nenhum problema óbvio encontrado — mas dá uma conferida nas linhas abaixo mesmo assim.</div>';
 
   const contagemHtml = '<p style="font-size:12px; margin:0 0 10px;"><b>' + novosCount + '</b> Colab(s) novo(s) · <b>' + jaExistemCount + '</b> já cadastrado(s) (' +
-    (jaExistemCount > 0 ? 'serão <b>atualizados</b> se a opção acima estiver marcada, ou <b>pulados</b> se não estiver' : 'nenhum, tudo será cadastrado como novo') + ')</p>';
+    (jaExistemCount > 0 ? 'com a opção acima marcada, só os que tiverem <b>Vistoria diferente</b> da atual serão atualizados — o resto fica como está' : 'nenhum, tudo será cadastrado como novo') + ')</p>';
 
   const amostra = parsed.slice(0, 8);
   const linhasHtml = amostra.map(r => `
@@ -916,16 +1044,21 @@ async function confirmarImportacao(){
   const statusEl = document.getElementById('import-status');
 
   statusEl.textContent = 'Verificando Colabs já cadastrados…';
-  const colabIdMap = await fetchColabIdMap();
+  const { idDe: colabIdMap, vistoriaDe } = await fetchColabIdMap();
   const seen = new Set(Object.keys(colabIdMap));
   const toInsert = [];
   const toUpdate = [];
   let skippedDup = 0;
+  let semMudanca = 0;
   parsed.forEach(rec => {
     const key = normalizeColab(rec.colab);
     if(key && colabIdMap[key]){
       if(modoAtualizacao){
-        toUpdate.push({ id: colabIdMap[key], vistoria: rec.vistoria });
+        if(vistoriaDe[key] === rec.vistoria){
+          semMudanca++;
+        } else {
+          toUpdate.push({ id: colabIdMap[key], vistoria: rec.vistoria });
+        }
       } else {
         skippedDup++;
       }
@@ -936,7 +1069,10 @@ async function confirmarImportacao(){
   });
 
   if(toInsert.length === 0 && toUpdate.length === 0){
-    statusEl.textContent = 'Nenhum registro importado — todos os ' + skippedDup + ' número(s) de Colab já existiam.';
+    const motivos = [];
+    if(skippedDup > 0) motivos.push(skippedDup + ' já existiam');
+    if(semMudanca > 0) motivos.push(semMudanca + ' sem mudança de status');
+    statusEl.textContent = 'Nenhum registro importado — ' + (motivos.join(' · ') || 'nada a fazer') + '.';
     pendingImport = null;
     return;
   }
@@ -980,6 +1116,7 @@ async function confirmarImportacao(){
     let resumo = [];
     if(inserted > 0) resumo.push(inserted + ' cadastrado(s)');
     if(updated > 0) resumo.push(updated + ' atualizado(s)');
+    if(semMudanca > 0) resumo.push(semMudanca + ' sem mudança (ignorado(s))');
     if(skippedDup > 0) resumo.push(skippedDup + ' pulado(s) por Colab duplicado');
     statusEl.textContent = resumo.join(' · ') + '.';
     await loadRecords();
@@ -1279,13 +1416,20 @@ let chamadoAtualDados = null;
 
 async function buscarNomesEquipe(){
   try{
-    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome', { headers: supaHeaders() });
-    if(!res.ok) return {};
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome,avatar_url,role', { headers: supaHeaders() });
+    if(!res.ok) return { nomeDe: {}, fotoDe: {}, cargoDe: {} };
     const perfis = await res.json();
     const nomeDe = {};
-    perfis.forEach(p => { if(p.email) nomeDe[p.email] = p.nome || p.email; });
-    return nomeDe;
-  }catch(e){ return {}; }
+    const fotoDe = {};
+    const cargoDe = {};
+    perfis.forEach(p => {
+      if(!p.email) return;
+      nomeDe[p.email] = p.nome || p.email;
+      if(p.avatar_url) fotoDe[p.email] = p.avatar_url;
+      if(p.role) cargoDe[p.email] = p.role;
+    });
+    return { nomeDe: nomeDe, fotoDe: fotoDe, cargoDe: cargoDe };
+  }catch(e){ return { nomeDe: {}, fotoDe: {}, cargoDe: {} }; }
 }
 
 function mostrarChamadosView(view){
@@ -1297,6 +1441,63 @@ function mostrarChamadosView(view){
 /* ===== Notificações ===== */
 let notifTimer = null;
 let notificacoesCache = [];
+
+/* Pisca o título da aba e o favicon quando chega novidade e a aba está em segundo plano */
+const TITULO_ORIGINAL = document.title;
+let notifFlashTimer = null;
+let notifFlashAceso = false;
+
+const faviconPontoCache = {};
+
+function gerarFaviconComPonto(hrefOriginal, onReady){
+  if(faviconPontoCache[hrefOriginal]){ onReady(faviconPontoCache[hrefOriginal]); return; }
+  const img = new Image();
+  img.onload = () => {
+    try{
+      const size = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      ctx.beginPath();
+      ctx.arc(size*0.80, size*0.20, size*0.16, 0, Math.PI*2);
+      ctx.fillStyle = '#E14B3C';
+      ctx.fill();
+      ctx.lineWidth = size*0.05;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      const url = canvas.toDataURL('image/png');
+      faviconPontoCache[hrefOriginal] = url;
+      onReady(url);
+    }catch(e){ onReady(hrefOriginal); }
+  };
+  img.onerror = () => onReady(hrefOriginal);
+  img.src = hrefOriginal;
+}
+
+function iniciarFlashNotificacao(){
+  if(notifFlashTimer) return;
+  const faviconEl = document.getElementById('favicon');
+  const faviconNormal = faviconEl.href;
+  notifFlashAceso = false;
+  let faviconPonto = null;
+  gerarFaviconComPonto(faviconNormal, (url) => { faviconPonto = url; });
+  notifFlashTimer = setInterval(()=>{
+    notifFlashAceso = !notifFlashAceso;
+    document.title = notifFlashAceso ? '🔴 Nova notificação' : TITULO_ORIGINAL;
+    faviconEl.href = notifFlashAceso ? (faviconPonto || faviconNormal) : faviconNormal;
+  }, 1200);
+}
+
+function pararFlashNotificacao(){
+  if(notifFlashTimer){ clearInterval(notifFlashTimer); notifFlashTimer = null; }
+  document.title = TITULO_ORIGINAL;
+  syncThemeVisuals();
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden) pararFlashNotificacao();
+});
 
 function getUltimaVisita(chave){
   let v = localStorage.getItem(chave);
@@ -1371,6 +1572,9 @@ function renderNotificacoes(){
   if(count > 0){ badge.style.display = 'flex'; badge.style.alignItems = 'center'; badge.style.justifyContent = 'center'; badge.textContent = count > 9 ? '9+' : String(count); }
   else { badge.style.display = 'none'; }
 
+  if(count > 0 && document.hidden) iniciarFlashNotificacao();
+  else pararFlashNotificacao();
+
   const pop = document.getElementById('notif-popover');
   if(count === 0){
     pop.innerHTML = '<p style="font-size:12px; color:var(--ink-soft); padding:10px; margin:0;">Nenhuma novidade.</p>';
@@ -1420,13 +1624,13 @@ let chamadosNomeDeCache = {};
 async function carregarChamados(){
   const listaEl = document.getElementById('chamados-lista');
   try{
-    const [resChamados, nomeDe] = await Promise.all([
+    const [resChamados, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/chamados?select=*&order=criado_em.desc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
     if(!resChamados.ok) throw new Error('fail');
     chamadosListaCache = await resChamados.json();
-    chamadosNomeDeCache = nomeDe;
+    chamadosNomeDeCache = equipe.nomeDe;
     renderizarListaChamados();
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar os chamados.</p>';
@@ -1512,7 +1716,7 @@ async function carregarMensagensChamado(chamadoId){
   const headerEl = document.getElementById('chamado-thread-header');
   const msgsEl = document.getElementById('chamado-thread-mensagens');
   try{
-    const [resChamado, resMsgs, nomeDe] = await Promise.all([
+    const [resChamado, resMsgs, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/chamados?id=eq.' + encodeURIComponent(chamadoId) + '&select=*', { headers: supaHeaders() }),
       supaFetch(SUPABASE_URL + '/rest/v1/chamados_mensagens?chamado_id=eq.' + encodeURIComponent(chamadoId) + '&select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
@@ -1523,6 +1727,7 @@ async function carregarMensagensChamado(chamadoId){
     const mensagens = await resMsgs.json();
     if(!chamado){ headerEl.innerHTML = ''; msgsEl.innerHTML = '<p>Chamado não encontrado.</p>'; return; }
     chamadoAtualDados = chamado;
+    const nomeDe = equipe.nomeDe, fotoDe = equipe.fotoDe, cargoDe = equipe.cargoDe;
 
     const statusLabelChamado = { aberto:'Aberto', em_andamento:'Em andamento', resolvido:'Resolvido' };
     const autor = chamado.criado_por ? (nomeDe[chamado.criado_por] || chamado.criado_por) : '—';
@@ -1548,8 +1753,9 @@ async function carregarMensagensChamado(chamadoId){
     } else {
       msgsEl.innerHTML = mensagens.map(m => {
         const autorMsg = m.autor ? (nomeDe[m.autor] || m.autor) : '—';
-        return '<div class="chat-bubble"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
-          '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div>';
+        return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autorMsg, 'sm', m.autor ? fotoDe[m.autor] : null, m.autor, m.autor ? cargoDe[m.autor] : null) +
+          '<div class="chat-body"><span class="chat-autor">' + escHtml(autorMsg) + '</span>' + escHtml(m.mensagem) +
+          '<span class="chat-quando">' + new Date(m.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
       }).join('');
     }
     msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -1647,19 +1853,23 @@ function destacarMencoes(textoEscapado){
 
 let anotacoesCache = [];
 let anotacoesNomeDeCache = {};
+let anotacoesFotoDeCache = {};
+let anotacoesCargoDeCache = {};
 let anotacaoEditandoId = null;
 
 async function carregarAnotacoes(){
   const listaEl = document.getElementById('anotacoes-lista');
   try{
-    const [resAnot, nomeDe] = await Promise.all([
+    const [resAnot, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/anotacoes?select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
     if(!resAnot.ok) throw new Error('fail');
     anotacoesCache = await resAnot.json();
-    anotacoesNomeDeCache = nomeDe;
-    anotacoesNomes = [...new Set(Object.values(nomeDe)), 'everyone'];
+    anotacoesNomeDeCache = equipe.nomeDe;
+    anotacoesFotoDeCache = equipe.fotoDe;
+    anotacoesCargoDeCache = equipe.cargoDe;
+    anotacoesNomes = [...new Set(Object.values(equipe.nomeDe)), 'everyone'];
     renderAnotacoesLista();
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar as anotações.</p>';
@@ -1677,17 +1887,19 @@ function renderAnotacoesLista(){
 
   listaEl.innerHTML = anotacoesCache.map(a => {
     const autor = a.autor ? (anotacoesNomeDeCache[a.autor] || a.autor) : '—';
+    const foto = a.autor ? anotacoesFotoDeCache[a.autor] : null;
+    const cargo = a.autor ? anotacoesCargoDeCache[a.autor] : null;
     const quandoTxt = new Date(a.criado_em).toLocaleString('pt-BR');
 
     if(a.id === anotacaoEditandoId){
-      return '<div class="chat-bubble" data-id="' + a.id + '">' +
+      return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, a.autor, cargo) + '<div class="chat-body">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' +
         '<textarea id="anotacao-edit-input" rows="2" style="width:100%; font-family:\'IBM Plex Sans\', sans-serif; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink); box-sizing:border-box;">' + escHtml(a.mensagem) + '</textarea>' +
         '<div style="display:flex; gap:6px; margin-top:6px;">' +
           '<button type="button" class="secondary" onclick="cancelarEdicaoAnotacao()">Cancelar</button>' +
           '<button type="button" onclick="salvarEdicaoAnotacao(\'' + a.id + '\')">Salvar</button>' +
         '</div>' +
-      '</div>';
+      '</div></div></div>';
     }
 
     const podeEditar = currentUser && (currentUser.email === a.autor || isAdmin());
@@ -1698,13 +1910,13 @@ function renderAnotacoesLista(){
         '</span>'
       : '';
     const msgHtml = destacarMencoes(escHtml(a.mensagem));
-    return '<div class="chat-bubble" data-id="' + a.id + '">' +
+    return '<div class="chat-bubble" data-id="' + a.id + '"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, a.autor, cargo) + '<div class="chat-body">' +
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
         '<span class="chat-autor">' + escHtml(autor) + '</span>' + icones +
       '</div>' +
       '<div>' + msgHtml + '</div>' +
       '<span class="chat-quando">' + quandoTxt + (a.editado_em ? ' · editado' : '') + '</span>' +
-    '</div>';
+    '</div></div></div>';
   }).join('');
   if(!anotacaoEditandoId) listaEl.scrollTop = listaEl.scrollHeight;
 }
@@ -1786,7 +1998,7 @@ async function carregarNotaColab(){
   if(!notaColabRegistroId) return;
   const listaEl = document.getElementById('nota-colab-lista');
   try{
-    const [resNotas, nomeDe] = await Promise.all([
+    const [resNotas, equipe] = await Promise.all([
       supaFetch(SUPABASE_URL + '/rest/v1/registros_notas?registro_id=eq.' + encodeURIComponent(notaColabRegistroId) + '&select=*&order=criado_em.asc', { headers: supaHeaders() }),
       buscarNomesEquipe()
     ]);
@@ -1796,14 +2008,38 @@ async function carregarNotaColab(){
       listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Este colab não possui anotações.</p>';
       return;
     }
+    const ICON_TRASH_NOTA = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
     listaEl.innerHTML = notas.map(n => {
-      const autor = n.autor ? (nomeDe[n.autor] || n.autor) : '—';
-      return '<div class="chat-bubble"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
-        '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div>';
+      const autor = n.autor ? (equipe.nomeDe[n.autor] || n.autor) : '—';
+      const foto = n.autor ? equipe.fotoDe[n.autor] : null;
+      const cargo = n.autor ? equipe.cargoDe[n.autor] : null;
+      const btnExcluir = isAdmin()
+        ? '<button type="button" class="icon-btn" style="width:20px; height:20px; margin-left:auto; flex-shrink:0;" onclick="excluirNotaColab(\'' + n.id + '\')" title="Excluir anotação">' + ICON_TRASH_NOTA + '</button>'
+        : '';
+      return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, n.autor, cargo) +
+        '<div class="chat-body"><div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
+          '<span class="chat-autor">' + escHtml(autor) + '</span>' + btnExcluir +
+        '</div>' + escHtml(n.mensagem) +
+        '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
     }).join('');
     listaEl.scrollTop = listaEl.scrollHeight;
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar as anotações.</p>';
+  }
+}
+
+async function excluirNotaColab(id){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir esta anotação?')) return;
+  try{
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_notas?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: supaHeaders()
+    });
+    if(!res.ok) throw new Error('falhou');
+    carregarNotaColab();
+  }catch(e){
+    alert('Não foi possível excluir a anotação.');
   }
 }
 
@@ -1874,7 +2110,7 @@ function selecionarMencao(nome){
 async function abrirHistorico(){
   document.getElementById('historico-overlay').classList.add('open');
   const tbody = document.getElementById('historico-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>';
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_excluidos?select=*&order=deletado_em.desc', {
       headers: supaHeaders()
@@ -2017,6 +2253,10 @@ function statusIcon(status){
 function abrirMapa(){
   document.getElementById('mapa-overlay').classList.add('open');
   document.getElementById('mapa-status').textContent = '';
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = 'none';
+  document.getElementById('btn-limpar-rota').style.display = 'none';
+  if(rotaLayer && leafletMap){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
 
   if(!leafletMap){
     leafletMap = L.map('mapa-container').setView([-22.883, -43.103], 13);
@@ -2108,6 +2348,107 @@ async function geocodificarPendentes(){
   btn.disabled = false;
   await loadRecords();
   alert('Geocodificação concluída: ' + done + ' registro(s) processado(s).');
+}
+
+/* ===== Rota por proximidade ===== */
+let rotaLayer = null;
+
+function distanciaKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function ordenarPorProximidade(pontos){
+  const restantes = pontos.slice();
+  // começa pelo ponto mais a noroeste, pra ter um ponto de partida consistente
+  restantes.sort((a,b) => (b.latitude - a.latitude) || (a.longitude - b.longitude));
+  const rota = [restantes.shift()];
+  while(restantes.length > 0){
+    const atual = rota[rota.length - 1];
+    let melhorIdx = 0, melhorDist = Infinity;
+    restantes.forEach((p, i) => {
+      const d = distanciaKm(atual.latitude, atual.longitude, p.latitude, p.longitude);
+      if(d < melhorDist){ melhorDist = d; melhorIdx = i; }
+    });
+    rota.push(restantes.splice(melhorIdx, 1)[0]);
+  }
+  return rota;
+}
+
+function numeroIcon(n){
+  return L.divIcon({
+    className: 'rota-marker',
+    html: '<div style="background:#16233A; color:#fff; width:24px; height:24px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">' +
+      '<span style="transform:rotate(45deg); font-family:\'IBM Plex Mono\', monospace; font-weight:700; font-size:11px;">' + n + '</span></div>',
+    iconSize: [24,24],
+    iconAnchor: [12,24],
+    popupAnchor: [0,-24]
+  });
+}
+
+function calcularRotaProximidade(){
+  const filtered = getFiltered();
+  const pontos = filtered.filter(r => r.vistoria === 'agendada' && r.latitude && r.longitude);
+
+  if(pontos.length < 2){
+    document.getElementById('mapa-status').textContent = 'Precisa de pelo menos 2 vistorias "Agendada" com coordenadas (respeitando os filtros ativos) pra montar uma rota.';
+    return;
+  }
+
+  const rota = ordenarPorProximidade(pontos);
+
+  if(markerClusterGroup) leafletMap.removeLayer(markerClusterGroup);
+  if(rotaLayer) leafletMap.removeLayer(rotaLayer);
+  rotaLayer = L.layerGroup();
+
+  const latlngs = rota.map(r => [r.latitude, r.longitude]);
+  L.polyline(latlngs, { color: '#16233A', weight: 3, opacity: 0.7, dashArray: '6 6' }).addTo(rotaLayer);
+
+  let distanciaTotal = 0;
+  for(let i = 1; i < rota.length; i++){
+    distanciaTotal += distanciaKm(rota[i-1].latitude, rota[i-1].longitude, rota[i].latitude, rota[i].longitude);
+  }
+
+  rota.forEach((r, i) => {
+    const marker = L.marker([r.latitude, r.longitude], { icon: numeroIcon(i + 1) });
+    marker.bindPopup(
+      '<b>' + (i + 1) + '. ' + escHtml(r.colab) + '</b> — ' + escHtml(r.responsavel) + '<br>' +
+      escHtml(r.processo) + '<br>' + escHtml(r.endereco) + ' — ' + escHtml(r.bairro)
+    );
+    rotaLayer.addLayer(marker);
+  });
+
+  rotaLayer.addTo(leafletMap);
+  const bounds = L.latLngBounds(latlngs);
+  leafletMap.fitBounds(bounds, {padding: [30,30], maxZoom: 16});
+
+  document.getElementById('mapa-rota-lista').innerHTML = rota.map((r, i) =>
+    '<li style="margin-bottom:6px;"><b>' + escHtml(r.colab) + '</b><br>' + escHtml(r.endereco) + ' — ' + escHtml(r.bairro) + '</li>'
+  ).join('');
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = '';
+  document.getElementById('btn-toggle-rota-lista').textContent = 'Ver lista';
+  document.getElementById('btn-limpar-rota').style.display = '';
+  document.getElementById('mapa-status').textContent = rota.length + ' parada(s) na rota — cerca de ' + distanciaTotal.toFixed(1) + ' km em linha reta entre elas. Toque nos números no mapa (ou em "Ver lista") pra ver os endereços.';
+}
+
+function toggleRotaLista(){
+  const painel = document.getElementById('mapa-rota-painel');
+  const aberto = painel.style.display !== 'none';
+  painel.style.display = aberto ? 'none' : '';
+  document.getElementById('btn-toggle-rota-lista').textContent = aberto ? 'Ver lista' : 'Ocultar lista';
+}
+
+function limparRota(){
+  if(rotaLayer){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
+  if(markerClusterGroup) markerClusterGroup.addTo(leafletMap);
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = 'none';
+  document.getElementById('btn-limpar-rota').style.display = 'none';
+  document.getElementById('mapa-status').textContent = '';
 }
 
 document.getElementById('btn-atividade').addEventListener('click', abrirAtividade);
@@ -2256,6 +2597,9 @@ document.getElementById('btn-mapa').addEventListener('click', abrirMapa);
 document.getElementById('btn-fechar-mapa').addEventListener('click', ()=> document.getElementById('mapa-overlay').classList.remove('open'));
 document.getElementById('mapa-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'mapa-overlay') document.getElementById('mapa-overlay').classList.remove('open'); });
 document.getElementById('btn-geocodificar').addEventListener('click', geocodificarPendentes);
+document.getElementById('btn-rota-proximidade').addEventListener('click', calcularRotaProximidade);
+document.getElementById('btn-toggle-rota-lista').addEventListener('click', toggleRotaLista);
+document.getElementById('btn-limpar-rota').addEventListener('click', limparRota);
 document.getElementById('btn-abrir-aviso').addEventListener('click', abrirFormAviso);
 document.getElementById('btn-cancelar-aviso').addEventListener('click', ()=> document.getElementById('aviso-form-overlay').classList.remove('open'));
 document.getElementById('btn-enviar-aviso-form').addEventListener('click', enviarAvisoGlobal);
@@ -2274,6 +2618,40 @@ function updateBulkBar(){
   document.getElementById('bulk-status').style.display = editable ? '' : 'none';
   document.getElementById('btn-bulk-apply-status').style.display = editable ? '' : 'none';
   document.getElementById('btn-bulk-delete').style.display = editable ? '' : 'none';
+}
+
+function abrirBulkNota(){
+  if(selectedIds.size === 0) return;
+  document.getElementById('bulk-nota-contagem').textContent = 'Essa anotação vai ser adicionada a ' + selectedIds.size + ' registro(s) selecionado(s).';
+  document.getElementById('bulk-nota-texto').value = '';
+  document.getElementById('bulk-nota-msg').textContent = '';
+  document.getElementById('bulk-nota-overlay').classList.add('open');
+}
+
+async function enviarBulkNota(){
+  const msgEl = document.getElementById('bulk-nota-msg');
+  const texto = document.getElementById('bulk-nota-texto').value.trim();
+  if(!texto){ msgEl.textContent = 'Escreva uma anotação antes de enviar.'; return; }
+  if(selectedIds.size === 0){ msgEl.textContent = 'Nenhum registro selecionado.'; return; }
+
+  msgEl.textContent = 'Enviando…';
+  try{
+    const linhas = [...selectedIds].map(id => ({
+      id: uid(), registro_id: id, autor: currentUser ? currentUser.email : null, mensagem: texto
+    }));
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_notas', {
+      method: 'POST',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify(linhas)
+    });
+    if(!res.ok) throw new Error('falhou');
+    document.getElementById('bulk-nota-overlay').classList.remove('open');
+    selectedIds.clear();
+    renderTable();
+    updateBulkBar();
+  }catch(e){
+    msgEl.textContent = 'Não foi possível adicionar a anotação a todos os registros. Tente novamente.';
+  }
 }
 
 async function bulkApplyStatus(){
@@ -2334,11 +2712,16 @@ document.getElementById('select-all-checkbox').addEventListener('change', (e)=>{
 
 document.getElementById('btn-bulk-apply-status').addEventListener('click', bulkApplyStatus);
 document.getElementById('btn-bulk-delete').addEventListener('click', bulkDelete);
+document.getElementById('btn-bulk-nota').addEventListener('click', abrirBulkNota);
 document.getElementById('btn-bulk-clear').addEventListener('click', ()=>{
   selectedIds.clear();
   renderTable();
   updateBulkBar();
 });
+
+document.getElementById('btn-cancelar-bulk-nota').addEventListener('click', ()=> document.getElementById('bulk-nota-overlay').classList.remove('open'));
+document.getElementById('btn-enviar-bulk-nota').addEventListener('click', enviarBulkNota);
+document.getElementById('bulk-nota-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'bulk-nota-overlay') document.getElementById('bulk-nota-overlay').classList.remove('open'); });
 
 ['f-status','f-tiposervico'].forEach(id=>{
   document.getElementById(id).addEventListener('change', ()=>{ page = 1; render(); });
@@ -2372,19 +2755,166 @@ popularBairros();
 
 function syncThemeVisuals(){
   const on = document.body.classList.contains('theme-admin');
-  document.getElementById('user-box-icon').style.display = on ? 'none' : '';
-  document.getElementById('user-box-icon-admin').style.display = on ? '' : 'none';
-  document.getElementById('voyage-scene').style.display = on ? 'block' : 'none';
+  const temFoto = !!(currentUser && currentUser.avatarUrl);
+  document.getElementById('user-box-icon').style.display = (on || temFoto) ? 'none' : '';
+  document.getElementById('user-box-icon-admin').style.display = (on && !temFoto) ? '' : 'none';
+  const usar3D = on && typeof THREE !== 'undefined';
+  document.getElementById('voyage-scene').style.display = (on && !usar3D) ? 'block' : 'none';
+  atualizarVoyageScene3D(usar3D);
   document.getElementById('favicon').href = on
     ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230B0F17'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23C9A227' stroke-width='5'/%3E%3Cpolygon points='50,16 60,50 50,44 40,50' fill='%23C9A227'/%3E%3Cpolygon points='50,84 60,50 50,56 40,50' fill='%23C9A227' opacity='0.5'/%3E%3C/svg%3E"
-    : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2316233A'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='%23F7F5EF' font-family='monospace'%3EP%3C/text%3E%3C/svg%3E";
+    : "icons/favicon-32.png";
+}
+
+/* ===== Cena 3D do cabeçalho — tema Admin (bússola do viajante) ===== */
+let voyage3D = null;
+
+function iniciarVoyageScene3D(){
+  if(voyage3D || typeof THREE === 'undefined') return;
+  const canvas = document.getElementById('voyage-scene-3d');
+  const header = document.querySelector('header');
+  if(!canvas || !header) return;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 100);
+  camera.position.set(0, 2.2, 9);
+  camera.lookAt(0, 0.5, 0);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0x8fa0ae, 0.9));
+  const luzDourada = new THREE.DirectionalLight(0xC9A227, 1.1);
+  luzDourada.position.set(3, 4, 2);
+  scene.add(luzDourada);
+
+  // estrelas
+  const starCount = 140;
+  const starPos = new Float32Array(starCount * 3);
+  for(let i = 0; i < starCount; i++){
+    starPos[i*3] = (Math.random() - 0.5) * 20;
+    starPos[i*3 + 1] = Math.random() * 5 + 1.5;
+    starPos[i*3 + 2] = (Math.random() - 0.5) * 10 - 2;
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xE8E1CD, size: 0.05, transparent: true, opacity: 0.8 });
+  const estrelas = new THREE.Points(starGeo, starMat);
+  scene.add(estrelas);
+
+  // oceano
+  const oceanGeo = new THREE.PlaneGeometry(30, 12, 60, 24);
+  const oceanMat = new THREE.MeshStandardMaterial({ color: 0x1F4C5A, transparent: true, opacity: 0.85, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.1 });
+  const oceano = new THREE.Mesh(oceanGeo, oceanMat);
+  oceano.rotation.x = -Math.PI / 2.4;
+  oceano.position.set(0, -1.4, -1);
+  scene.add(oceano);
+  const oceanPos = oceanGeo.attributes.position;
+  const oceanBase = Float32Array.from(oceanPos.array);
+
+  // navio estilizado
+  const navio = new THREE.Group();
+  const casco = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.55, 1.6, 4, 1, false),
+    new THREE.MeshStandardMaterial({ color: 0x0B0F17, roughness: 0.7 })
+  );
+  casco.rotation.z = Math.PI / 2;
+  casco.scale.set(1, 1, 0.5);
+  navio.add(casco);
+  const mastro = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), new THREE.MeshStandardMaterial({ color: 0x0B0F17 }));
+  mastro.position.y = 0.7;
+  navio.add(mastro);
+  const vela = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 3), new THREE.MeshStandardMaterial({ color: 0x16222E, side: THREE.DoubleSide }));
+  vela.rotation.z = Math.PI / 2;
+  vela.position.set(0.25, 0.75, 0);
+  navio.add(vela);
+  navio.position.set(-2.6, -0.6, 0.5);
+  navio.rotation.y = 0.3;
+  scene.add(navio);
+
+  // bússola do viajante
+  const bussola = new THREE.Group();
+  const anel = new THREE.Mesh(
+    new THREE.TorusGeometry(0.9, 0.05, 12, 40),
+    new THREE.MeshStandardMaterial({ color: 0xC9A227, metalness: 0.6, roughness: 0.3, emissive: 0x3a2d08, emissiveIntensity: 0.3 })
+  );
+  bussola.add(anel);
+  const agulhaN = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0xC9A227, metalness: 0.5, roughness: 0.4 }));
+  bussola.add(agulhaN);
+  const agulhaS = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0x7A611A, metalness: 0.5, roughness: 0.4 }));
+  agulhaS.rotation.z = Math.PI;
+  bussola.add(agulhaS);
+  bussola.position.set(3.4, 1.1, -1.5);
+  bussola.rotation.x = 0.3;
+  scene.add(bussola);
+
+  let mouseX = 0, mouseY = 0, alvoX = 0, alvoY = 0;
+  function aoMoverMouse(e){
+    const r = header.getBoundingClientRect();
+    mouseX = ((e.clientX - r.left) / r.width - 0.5) * 2;
+    mouseY = ((e.clientY - r.top) / r.height - 0.5) * 2;
+  }
+  header.addEventListener('mousemove', aoMoverMouse);
+
+  function ajustarTamanho(){
+    const r = canvas.parentElement.getBoundingClientRect();
+    if(r.width === 0 || r.height === 0) return;
+    renderer.setSize(r.width, r.height, false);
+    camera.aspect = r.width / r.height;
+    camera.updateProjectionMatrix();
+  }
+  ajustarTamanho();
+  window.addEventListener('resize', ajustarTamanho);
+
+  const clock = new THREE.Clock();
+  function animar(){
+    voyage3D.raf = requestAnimationFrame(animar);
+    const t = clock.getElapsedTime();
+
+    for(let i = 0; i < oceanPos.count; i++){
+      const ix = oceanBase[i*3], iz = oceanBase[i*3 + 2];
+      oceanPos.setY(i, Math.sin(ix * 0.6 + t * 0.9) * 0.18 + Math.cos(iz * 0.5 + t * 0.7) * 0.12);
+    }
+    oceanPos.needsUpdate = true;
+
+    starMat.opacity = 0.55 + Math.sin(t * 1.4) * 0.25;
+    bussola.rotation.y = t * 0.35;
+    navio.position.y = -0.6 + Math.sin(t * 1.1) * 0.06;
+    navio.rotation.z = Math.sin(t * 0.8) * 0.05;
+
+    alvoX += (mouseX - alvoX) * 0.04;
+    alvoY += (mouseY - alvoY) * 0.04;
+    camera.position.x = alvoX * 0.8;
+    camera.position.y = 2.2 - alvoY * 0.4;
+    camera.lookAt(0, 0.5, 0);
+
+    renderer.render(scene, camera);
+  }
+
+  voyage3D = { renderer: renderer, raf: null, animar: animar };
+  animar();
+}
+
+function atualizarVoyageScene3D(ligar){
+  const canvas = document.getElementById('voyage-scene-3d');
+  if(!canvas) return;
+  if(!ligar){
+    canvas.style.display = 'none';
+    if(voyage3D && voyage3D.raf){ cancelAnimationFrame(voyage3D.raf); voyage3D.raf = null; }
+    return;
+  }
+  canvas.style.display = 'block';
+  if(!voyage3D) iniciarVoyageScene3D();
+  else if(!voyage3D.raf) voyage3D.animar();
 }
 
 function applyRolePermissions(){
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
+  document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
   document.getElementById('role-badge').textContent = currentUser ? currentUser.nome : '';
+  document.getElementById('user-avatar').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'lg', currentUser.avatarUrl, currentUser.email, currentRole) : '';
   document.getElementById('btn-toggle-theme').style.display = isAdmin() ? '' : 'none';
   document.body.classList.toggle('theme-admin', isAdmin());
   syncThemeVisuals();
@@ -2419,12 +2949,13 @@ async function doLogin(){
     accessToken = data.access_token;
     currentUser = { id: data.user.id, email: data.user.email };
 
-    const profRes = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id + '&select=role,nome', {
+    const profRes = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id + '&select=role,nome,avatar_url', {
       headers: supaHeaders()
     });
     const profData = await profRes.json();
     currentRole = (profData && profData[0] && profData[0].role) || 'operador';
     currentUser.nome = (profData && profData[0] && profData[0].nome) || currentUser.email;
+    currentUser.avatarUrl = (profData && profData[0] && profData[0].avatar_url) || null;
 
     errEl.textContent = '';
     document.getElementById('login-overlay').classList.remove('open');
@@ -2518,6 +3049,7 @@ function doLogout(){
   clearInterval(notifTimer);
   document.getElementById('notif-badge').style.display = 'none';
   notificacoesCache = [];
+  pararFlashNotificacao();
   clearInterval(avisoTimer);
   document.getElementById('aviso-banner').style.display = 'none';
   document.body.classList.remove('theme-admin');
@@ -2564,6 +3096,234 @@ async function salvarNovaSenha(){
     msgEl.textContent = 'Não foi possível trocar a senha. Tente novamente.';
   }
 }
+
+/* ===== Foto de perfil (avatar) ===== */
+let avatarArquivoSelecionado = null;
+
+function abrirAvatar(){
+  avatarArquivoSelecionado = null;
+  document.getElementById('avatar-file-input').value = '';
+  document.getElementById('avatar-msg').textContent = '';
+  document.getElementById('avatar-preview-wrap').innerHTML = currentUser ? avatarHtml(currentUser.nome, 'md', currentUser.avatarUrl, currentUser.email, currentRole) : '';
+  document.getElementById('avatar-overlay').classList.add('open');
+}
+
+document.getElementById('avatar-file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  const msgEl = document.getElementById('avatar-msg');
+  avatarArquivoSelecionado = null;
+  if(!file) return;
+  const tiposPermitidos = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  if(!tiposPermitidos.includes(file.type)){
+    msgEl.textContent = 'Formato não suportado. Use PNG, JPG, WEBP ou GIF.';
+    return;
+  }
+  if(file.size > 3 * 1024 * 1024){
+    msgEl.textContent = 'Arquivo muito grande. Máximo 3 MB.';
+    return;
+  }
+  msgEl.textContent = '';
+  avatarArquivoSelecionado = file;
+  const previewUrl = URL.createObjectURL(file);
+  document.getElementById('avatar-preview-wrap').innerHTML = '<img class="avatar-3d avatar-3d-md avatar-3d-foto" src="' + previewUrl + '" alt="">';
+});
+
+async function salvarAvatar(){
+  const msgEl = document.getElementById('avatar-msg');
+  if(!avatarArquivoSelecionado){
+    msgEl.textContent = 'Escolha um arquivo antes de salvar.';
+    return;
+  }
+  if(!currentUser) return;
+  msgEl.textContent = 'Enviando…';
+  try{
+    const ext = ((avatarArquivoSelecionado.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'png';
+    const caminho = currentUser.id + '/avatar.' + ext;
+    const resUpload = await supaFetch(SUPABASE_URL + '/storage/v1/object/avatars/' + caminho, {
+      method: 'POST',
+      headers: supaHeaders({ 'Content-Type': avatarArquivoSelecionado.type, 'x-upsert': 'true' }),
+      body: avatarArquivoSelecionado
+    });
+    if(!resUpload.ok) throw new Error('upload falhou');
+
+    const urlPublica = SUPABASE_URL + '/storage/v1/object/public/avatars/' + caminho + '?v=' + Date.now();
+    const resPatch = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
+      method: 'PATCH',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify({ avatar_url: urlPublica })
+    });
+    if(!resPatch.ok) throw new Error('patch falhou');
+
+    currentUser.avatarUrl = urlPublica;
+    applyRolePermissions();
+    document.getElementById('avatar-overlay').classList.remove('open');
+    avatarArquivoSelecionado = null;
+  }catch(e){
+    msgEl.textContent = 'Não foi possível salvar a foto. Tente novamente.';
+  }
+}
+
+async function removerAvatar(){
+  if(!currentUser) return;
+  const msgEl = document.getElementById('avatar-msg');
+  msgEl.textContent = 'Removendo…';
+  try{
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
+      method: 'PATCH',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify({ avatar_url: null })
+    });
+    if(!res.ok) throw new Error('fail');
+    currentUser.avatarUrl = null;
+    applyRolePermissions();
+    document.getElementById('avatar-overlay').classList.remove('open');
+    avatarArquivoSelecionado = null;
+  }catch(e){
+    msgEl.textContent = 'Não foi possível remover a foto.';
+  }
+}
+
+document.getElementById('btn-open-avatar').addEventListener('click', (e)=>{ e.preventDefault(); abrirAvatar(); });
+document.getElementById('btn-cancelar-avatar').addEventListener('click', ()=> document.getElementById('avatar-overlay').classList.remove('open'));
+document.getElementById('btn-salvar-avatar').addEventListener('click', salvarAvatar);
+document.getElementById('btn-remover-avatar').addEventListener('click', removerAvatar);
+document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-overlay') document.getElementById('avatar-overlay').classList.remove('open'); });
+
+document.getElementById('btn-fechar-zoom-avatar').addEventListener('click', fecharZoomAvatar);
+document.getElementById('avatar-zoom-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-zoom-overlay') fecharZoomAvatar(); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharZoomAvatar(); });
+
+/* ===== Relatório Mensal (Obra Civil) ===== */
+function abrirRelatorioMensal(){
+  const nomes = uniqueValues('responsavel');
+  document.getElementById('relatorio-responsavel-lista').innerHTML = nomes.map(v => `
+    <label class="chip-check">
+      <input type="checkbox" class="relatorio-resp-check" value="${escAttr(v)}"> ${escHtml(v)}
+    </label>
+  `).join('') || '<span style="font-size:12px; color:var(--ink-soft);">Nenhum responsável cadastrado.</span>';
+  document.getElementById('relatorio-responsavel-todos').checked = false;
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.remove('selected');
+  document.getElementById('relatorio-data-inicio').value = '';
+  document.getElementById('relatorio-data-fim').value = '';
+  document.getElementById('relatorio-msg').textContent = '';
+  document.getElementById('relatorio-overlay').classList.add('open');
+}
+
+function relatorioResponsaveisSelecionados(){
+  return [...document.querySelectorAll('.relatorio-resp-check:checked')].map(el => el.value);
+}
+
+document.getElementById('relatorio-responsavel-todos').addEventListener('change', (e)=>{
+  document.querySelectorAll('.relatorio-resp-check').forEach(el => {
+    el.checked = e.target.checked;
+    el.closest('.chip-check').classList.toggle('selected', e.target.checked);
+  });
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', e.target.checked);
+});
+document.getElementById('relatorio-responsavel-lista').addEventListener('change', (e)=>{
+  if(!e.target.classList.contains('relatorio-resp-check')) return;
+  e.target.closest('.chip-check').classList.toggle('selected', e.target.checked);
+  const todas = document.querySelectorAll('.relatorio-resp-check');
+  const marcadas = document.querySelectorAll('.relatorio-resp-check:checked');
+  const todasMarcadas = todas.length > 0 && todas.length === marcadas.length;
+  document.getElementById('relatorio-responsavel-todos').checked = todasMarcadas;
+  document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', todasMarcadas);
+});
+
+function formatarPeriodoRelatorio(dataInicio, dataFim){
+  const [y1, m1, d1] = dataInicio.split('-').map(Number);
+  const [y2, m2, d2] = dataFim.split('-').map(Number);
+  const mes1 = DP_MONTH_NAMES[m1 - 1].toUpperCase();
+  const mes2 = DP_MONTH_NAMES[m2 - 1].toUpperCase();
+  if(y1 === y2){
+    return `${d1} DE ${mes1} A ${d2} DE ${mes2} DE ${y2}`;
+  }
+  return `${d1} DE ${mes1} DE ${y1} A ${d2} DE ${mes2} DE ${y2}`;
+}
+
+function pausar(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function gerarRelatorioMensal(){
+  const msgEl = document.getElementById('relatorio-msg');
+  const responsaveis = relatorioResponsaveisSelecionados();
+  const dataInicio = document.getElementById('relatorio-data-inicio').value;
+  const dataFim = document.getElementById('relatorio-data-fim').value;
+
+  if(responsaveis.length === 0 || !dataInicio || !dataFim){
+    msgEl.textContent = 'Marque ao menos um responsável e preencha o período.';
+    return;
+  }
+  if(dataFim < dataInicio){
+    msgEl.textContent = 'A data final não pode ser antes da data inicial.';
+    return;
+  }
+
+  msgEl.textContent = 'Gerando relatório(s)…';
+
+  try{
+    const res = await fetch('templates/relatorio-mensal-obra-civil.docx');
+    if(!res.ok) throw new Error('template não encontrado');
+    const templateBuf = await res.arrayBuffer();
+    const periodo = formatarPeriodoRelatorio(dataInicio, dataFim);
+
+    let gerados = 0;
+    const semRegistros = [];
+
+    for(const responsavel of responsaveis){
+      const registros = records
+        .filter(r => r.responsavel === responsavel && r.tipoServico === 'obra_civil' && r.data >= dataInicio && r.data <= dataFim)
+        .sort((a,b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.processo).localeCompare(String(b.processo), 'pt-BR')));
+
+      if(registros.length === 0){
+        semRegistros.push(responsavel);
+        continue;
+      }
+
+      msgEl.textContent = `Gerando relatório de ${responsavel}… (${gerados + 1}/${responsaveis.length})`;
+
+      const zip = new PizZip(templateBuf);
+      const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      const realizados = registros.filter(r => r.vistoria === 'realizada');
+
+      doc.render({
+        periodo,
+        despachos: registros.map(r => ({ processo: r.processo })),
+        colabs: registros.map(r => ({ colab: r.colab })),
+        pares: registros.map(r => ({ processo: r.processo, colab: r.colab })),
+        enderecos: realizados.map(r => ({ endereco: r.endereco, bairro: r.bairro }))
+      });
+
+      const blob = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Relatorio_${responsavel.replace(/\s+/g,'_')}_${dataInicio}_a_${dataFim}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      gerados++;
+
+      if(responsaveis.length > 1) await pausar(400);
+    }
+
+    if(gerados === 0){
+      msgEl.textContent = 'Nenhum registro de Obra Civil encontrado para os responsáveis e período marcados.';
+      return;
+    }
+
+    let resumo = gerados === 1 ? '1 relatório gerado.' : `${gerados} relatórios gerados.`;
+    if(semRegistros.length > 0){
+      resumo += ` Sem registros no período: ${semRegistros.join(', ')}.`;
+    }
+    msgEl.textContent = resumo;
+  }catch(e){
+    msgEl.textContent = 'Não foi possível gerar o(s) relatório(s). Tente novamente.';
+  }
+}
+
+document.getElementById('btn-relatorio-mensal').addEventListener('click', (e)=>{ e.preventDefault(); abrirRelatorioMensal(); });
+document.getElementById('btn-cancelar-relatorio').addEventListener('click', ()=> document.getElementById('relatorio-overlay').classList.remove('open'));
+document.getElementById('btn-gerar-relatorio').addEventListener('click', gerarRelatorioMensal);
+document.getElementById('relatorio-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'relatorio-overlay') document.getElementById('relatorio-overlay').classList.remove('open'); });
 
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });

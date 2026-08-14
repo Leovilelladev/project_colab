@@ -373,7 +373,7 @@ function statusLabel(s){
 }
 
 /* Prazo esperado (em dias) pra cada status sair do lugar antes de virar "atrasado" na tabela. */
-const SLA_DIAS = { pendente: 5, agendada: 10 };
+const SLA_DIAS = { pendente: 5, agendada: 30 };
 
 function calcularAtrasoSLA(r){
   const limite = SLA_DIAS[r.vistoria];

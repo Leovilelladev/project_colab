@@ -44,13 +44,63 @@ function supaHeaders(extra){
 }
 
 async function supaFetch(url, options){
-  const res = await fetch(url, options);
+  const isWrite = !!(options && options.method && options.method !== 'GET');
+  let res;
+  try{
+    res = await fetch(url, options);
+  }catch(err){
+    if(isWrite) registrarAlteracaoPendente(url, options);
+    throw err;
+  }
   if(res.status === 401){
     handleSessionExpired();
     throw new Error('Sessão expirada');
   }
   return res;
 }
+
+let alteracoesPendentes = [];
+
+function registrarAlteracaoPendente(url, options){
+  alteracoesPendentes.push({ url: url, options: options });
+  atualizarBadgePendente();
+}
+
+function atualizarBadgePendente(){
+  const badge = document.getElementById('sync-pendente-badge');
+  if(!badge) return;
+  const n = alteracoesPendentes.length;
+  if(n > 0){
+    badge.style.display = 'flex';
+    document.getElementById('sync-pendente-texto').textContent =
+      (n === 1 ? '1 alteração pendente de envio' : n + ' alterações pendentes de envio');
+  }else{
+    badge.style.display = 'none';
+  }
+}
+
+async function tentarReenviarPendentes(){
+  if(alteracoesPendentes.length === 0) return;
+  const badge = document.getElementById('sync-pendente-badge');
+  if(badge) badge.classList.add('sync-tentando');
+  const fila = alteracoesPendentes;
+  alteracoesPendentes = [];
+  let falharam = 0;
+  for(const item of fila){
+    try{
+      const res = await fetch(item.url, item.options);
+      if(!res.ok && res.status !== 401) falharam++, alteracoesPendentes.push(item);
+    }catch(e){
+      falharam++;
+      alteracoesPendentes.push(item);
+    }
+  }
+  if(badge) badge.classList.remove('sync-tentando');
+  atualizarBadgePendente();
+  if(falharam === 0 && fila.length > 0) loadRecords(true);
+}
+
+window.addEventListener('online', tentarReenviarPendentes);
 
 function handleSessionExpired(){
   currentRole = null;

@@ -335,19 +335,19 @@ function renderTable(){
   } else {
     tbody.innerHTML = pageItems.map(r => `
       <tr title="${escAttr(rowAuditTitle(r))}" class="row-clickable" onclick="cliqueNaLinha(event, '${r.id}', '${escAttr(r.colab)}')">
-        <td style="text-align:center;"><input type="checkbox" class="row-checkbox" data-id="${escAttr(r.id)}" ${selectedIds.has(r.id) ? 'checked' : ''}></td>
-        <td>${escHtml(r.colab)}</td>
-        <td>${escHtml(r.responsavel)}</td>
-        <td><span class="stamp ${r.tipoServico}">${tipoServicoLabel(r.tipoServico)}</span></td>
-        <td class="mono">${escHtml(r.processo)}</td>
-        <td><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span>${(() => {
+        <td style="text-align:center;" data-label=""><input type="checkbox" class="row-checkbox" data-id="${escAttr(r.id)}" ${selectedIds.has(r.id) ? 'checked' : ''}></td>
+        <td data-label="Colab">${escHtml(r.colab)}</td>
+        <td data-label="Responsável">${escHtml(r.responsavel)}</td>
+        <td data-label="Tipo de Serviço"><span class="stamp ${r.tipoServico}">${tipoServicoLabel(r.tipoServico)}</span></td>
+        <td class="mono" data-label="Processo">${escHtml(r.processo)}</td>
+        <td data-label="Vistoria"><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span>${(() => {
           const atraso = calcularAtrasoSLA(r);
           return atraso ? ` <span class="sla-alerta" title="${atraso.dias} dia(s) em ${statusLabel(r.vistoria)} — prazo esperado: ${atraso.limite} dia(s)">⚠</span>` : '';
         })()}</td>
-        <td class="mono">${formatDate(r.data)}</td>
-        <td>${escHtml(r.endereco)}</td>
-        <td>${escHtml(r.bairro)}</td>
-        <td class="actions">${canEdit() ? `
+        <td class="mono" data-label="Data">${formatDate(r.data)}</td>
+        <td data-label="Endereço">${escHtml(r.endereco)}</td>
+        <td data-label="Bairro">${escHtml(r.bairro)}</td>
+        <td class="actions" data-label="">${canEdit() ? `
           <button class="icon-btn" onclick="openEdit('${r.id}')" title="Editar" aria-label="Editar">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
           </button>

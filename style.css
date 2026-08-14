@@ -479,6 +479,50 @@
     .bulk-bar{flex-direction:column; align-items:stretch;}
     .bulk-bar select, .bulk-bar button{width:100%;}
     .date-popover{width:92vw; left:50%; transform:translateX(-50%);}
+
+    /* cabeçalho: caixa do usuário pode quebrar linha em telas bem pequenas */
+    .user-box{flex-wrap:wrap; justify-content:flex-end; row-gap:6px;}
+
+    /* alvos de toque um pouco maiores */
+    .icon-btn{width:34px; height:34px;}
+    button{padding:10px 14px;}
+
+    /* modais/painéis flutuantes: viram folha quase cheia de tela, sem arrastar/redimensionar */
+    .floating-panel{
+      top:2vh !important; left:2vw !important; right:2vw !important;
+      width:96vw !important; height:96vh !important; max-width:96vw !important; max-height:96vh !important;
+    }
+    .floating-panel-header{cursor:default; touch-action:auto;}
+    .resize-handle{display:none;}
+
+    /* mapa: painel de rota vira faixa inferior, pra não tomar a tela toda */
+    #mapa-rota-painel{
+      left:8px; right:8px; top:auto; bottom:8px; max-width:none; max-height:38vh;
+    }
+    #mapa-legenda{padding:6px 10px; font-size:11px;}
+  }
+
+  /* tabela de registros vira cards empilhados em telas estreitas */
+  @media (max-width:640px){
+    .table-scroll{overflow-x:visible;}
+    table, thead, tbody, tr{display:block; width:100%;}
+    thead{display:none;}
+    tbody tr{
+      border:1px solid var(--line); border-radius:var(--radius); margin-bottom:10px;
+      padding:10px 12px; background:var(--paper-2); box-shadow:0 1px 3px rgba(22,35,58,0.06);
+    }
+    tbody tr.empty-row{border:none; background:none; box-shadow:none; padding:0;}
+    tbody td{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:5px 0; border-bottom:none; text-align:right;
+    }
+    tbody td[data-label]:not([data-label=""])::before{
+      content:attr(data-label); font-size:10px; text-transform:uppercase; letter-spacing:0.4px;
+      color:var(--ink-soft); font-weight:600; flex-shrink:0; text-align:left;
+    }
+    tbody td.actions{justify-content:flex-end; margin-top:4px;}
+    tbody td[style*="text-align:center"]{justify-content:flex-start;}
+    .empty-row td{display:block !important; text-align:center; padding:36px 12px;}
   }
 
   /* ===== Tema Admin — capitão noturno / bússola do viajante ===== */

@@ -253,6 +253,13 @@
   .stamp.chamado-em_andamento{color:var(--ochre-dark); border-color:var(--ochre); background:rgba(194,121,46,0.08);}
   .stamp.chamado-resolvido{color:var(--green-dark); border-color:var(--green); background:rgba(75,122,93,0.08);}
 
+  .sla-alerta{
+    display:inline-block; color:var(--red-dark); font-size:12px; cursor:help;
+    animation:sla-pulse 1.6s ease-in-out infinite;
+  }
+  body.theme-admin .sla-alerta{color:var(--red);}
+  @keyframes sla-pulse{ 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+
   .chamado-card{
     border:1px solid var(--line); border-radius:var(--radius); background:var(--paper-2);
     padding:10px 12px; margin-bottom:8px; cursor:pointer;

@@ -340,7 +340,10 @@ function renderTable(){
         <td>${escHtml(r.responsavel)}</td>
         <td><span class="stamp ${r.tipoServico}">${tipoServicoLabel(r.tipoServico)}</span></td>
         <td class="mono">${escHtml(r.processo)}</td>
-        <td><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span></td>
+        <td><span class="stamp ${r.vistoria}">${statusLabel(r.vistoria)}</span>${(() => {
+          const atraso = calcularAtrasoSLA(r);
+          return atraso ? ` <span class="sla-alerta" title="${atraso.dias} dia(s) em ${statusLabel(r.vistoria)} — prazo esperado: ${atraso.limite} dia(s)">⚠</span>` : '';
+        })()}</td>
         <td class="mono">${formatDate(r.data)}</td>
         <td>${escHtml(r.endereco)}</td>
         <td>${escHtml(r.bairro)}</td>
@@ -367,6 +370,17 @@ function renderTable(){
 
 function statusLabel(s){
   return {pendente:'Pendente', agendada:'Agendada', realizada:'Realizada'}[s] || s || '—';
+}
+
+/* Prazo esperado (em dias) pra cada status sair do lugar antes de virar "atrasado" na tabela. */
+const SLA_DIAS = { pendente: 5, agendada: 10 };
+
+function calcularAtrasoSLA(r){
+  const limite = SLA_DIAS[r.vistoria];
+  if(!limite || !r.data) return null;
+  const dias = Math.floor((Date.now() - new Date(r.data + 'T00:00:00').getTime()) / 86400000);
+  if(dias <= limite) return null;
+  return { dias, limite };
 }
 function tipoServicoLabel(s){
   return {pavimentacao:'Pavimentação', obra_civil:'Obra Civil'}[s] || s || '—';
@@ -1378,6 +1392,39 @@ function mostrarChamadosView(view){
 let notifTimer = null;
 let notificacoesCache = [];
 
+/* Pisca o título da aba e o favicon quando chega novidade e a aba está em segundo plano */
+const TITULO_ORIGINAL = document.title;
+let notifFlashTimer = null;
+let notifFlashAceso = false;
+
+function faviconComPonto(hrefOriginal){
+  if(hrefOriginal.includes('cx=\'82\' cy=\'20\'')) return hrefOriginal;
+  return hrefOriginal.replace('%3C/svg%3E', "%3Ccircle cx='82' cy='20' r='16' fill='%23E14B3C' stroke='%23fff' stroke-width='3'/%3E%3C/svg%3E");
+}
+
+function iniciarFlashNotificacao(){
+  if(notifFlashTimer) return;
+  const faviconEl = document.getElementById('favicon');
+  const faviconNormal = faviconEl.href;
+  const faviconPonto = faviconComPonto(faviconNormal);
+  notifFlashAceso = false;
+  notifFlashTimer = setInterval(()=>{
+    notifFlashAceso = !notifFlashAceso;
+    document.title = notifFlashAceso ? '🔴 Nova notificação' : TITULO_ORIGINAL;
+    faviconEl.href = notifFlashAceso ? faviconPonto : faviconNormal;
+  }, 1200);
+}
+
+function pararFlashNotificacao(){
+  if(notifFlashTimer){ clearInterval(notifFlashTimer); notifFlashTimer = null; }
+  document.title = TITULO_ORIGINAL;
+  syncThemeVisuals();
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden) pararFlashNotificacao();
+});
+
 function getUltimaVisita(chave){
   let v = localStorage.getItem(chave);
   if(!v){ v = new Date().toISOString(); localStorage.setItem(chave, v); }
@@ -1450,6 +1497,9 @@ function renderNotificacoes(){
   const count = notificacoesCache.length;
   if(count > 0){ badge.style.display = 'flex'; badge.style.alignItems = 'center'; badge.style.justifyContent = 'center'; badge.textContent = count > 9 ? '9+' : String(count); }
   else { badge.style.display = 'none'; }
+
+  if(count > 0 && document.hidden) iniciarFlashNotificacao();
+  else pararFlashNotificacao();
 
   const pop = document.getElementById('notif-popover');
   if(count === 0){
@@ -2129,6 +2179,9 @@ function statusIcon(status){
 function abrirMapa(){
   document.getElementById('mapa-overlay').classList.add('open');
   document.getElementById('mapa-status').textContent = '';
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-limpar-rota').style.display = 'none';
+  if(rotaLayer && leafletMap){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
 
   if(!leafletMap){
     leafletMap = L.map('mapa-container').setView([-22.883, -43.103], 13);
@@ -2220,6 +2273,97 @@ async function geocodificarPendentes(){
   btn.disabled = false;
   await loadRecords();
   alert('Geocodificação concluída: ' + done + ' registro(s) processado(s).');
+}
+
+/* ===== Rota por proximidade ===== */
+let rotaLayer = null;
+
+function distanciaKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function ordenarPorProximidade(pontos){
+  const restantes = pontos.slice();
+  // começa pelo ponto mais a noroeste, pra ter um ponto de partida consistente
+  restantes.sort((a,b) => (b.latitude - a.latitude) || (a.longitude - b.longitude));
+  const rota = [restantes.shift()];
+  while(restantes.length > 0){
+    const atual = rota[rota.length - 1];
+    let melhorIdx = 0, melhorDist = Infinity;
+    restantes.forEach((p, i) => {
+      const d = distanciaKm(atual.latitude, atual.longitude, p.latitude, p.longitude);
+      if(d < melhorDist){ melhorDist = d; melhorIdx = i; }
+    });
+    rota.push(restantes.splice(melhorIdx, 1)[0]);
+  }
+  return rota;
+}
+
+function numeroIcon(n){
+  return L.divIcon({
+    className: 'rota-marker',
+    html: '<div style="background:#16233A; color:#fff; width:24px; height:24px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">' +
+      '<span style="transform:rotate(45deg); font-family:\'IBM Plex Mono\', monospace; font-weight:700; font-size:11px;">' + n + '</span></div>',
+    iconSize: [24,24],
+    iconAnchor: [12,24],
+    popupAnchor: [0,-24]
+  });
+}
+
+function calcularRotaProximidade(){
+  const filtered = getFiltered();
+  const pontos = filtered.filter(r => r.vistoria === 'agendada' && r.latitude && r.longitude);
+
+  if(pontos.length < 2){
+    document.getElementById('mapa-status').textContent = 'Precisa de pelo menos 2 vistorias "Agendada" com coordenadas (respeitando os filtros ativos) pra montar uma rota.';
+    return;
+  }
+
+  const rota = ordenarPorProximidade(pontos);
+
+  if(markerClusterGroup) leafletMap.removeLayer(markerClusterGroup);
+  if(rotaLayer) leafletMap.removeLayer(rotaLayer);
+  rotaLayer = L.layerGroup();
+
+  const latlngs = rota.map(r => [r.latitude, r.longitude]);
+  L.polyline(latlngs, { color: '#16233A', weight: 3, opacity: 0.7, dashArray: '6 6' }).addTo(rotaLayer);
+
+  let distanciaTotal = 0;
+  for(let i = 1; i < rota.length; i++){
+    distanciaTotal += distanciaKm(rota[i-1].latitude, rota[i-1].longitude, rota[i].latitude, rota[i].longitude);
+  }
+
+  rota.forEach((r, i) => {
+    const marker = L.marker([r.latitude, r.longitude], { icon: numeroIcon(i + 1) });
+    marker.bindPopup(
+      '<b>' + (i + 1) + '. ' + escHtml(r.colab) + '</b> — ' + escHtml(r.responsavel) + '<br>' +
+      escHtml(r.processo) + '<br>' + escHtml(r.endereco) + ' — ' + escHtml(r.bairro)
+    );
+    rotaLayer.addLayer(marker);
+  });
+
+  rotaLayer.addTo(leafletMap);
+  const bounds = L.latLngBounds(latlngs);
+  leafletMap.fitBounds(bounds, {padding: [30,30], maxZoom: 16});
+
+  document.getElementById('mapa-rota-lista').innerHTML = rota.map((r, i) =>
+    '<li style="margin-bottom:6px;"><b>' + escHtml(r.colab) + '</b><br>' + escHtml(r.endereco) + ' — ' + escHtml(r.bairro) + '</li>'
+  ).join('');
+  document.getElementById('mapa-rota-painel').style.display = '';
+  document.getElementById('btn-limpar-rota').style.display = '';
+  document.getElementById('mapa-status').textContent = rota.length + ' parada(s) na rota — cerca de ' + distanciaTotal.toFixed(1) + ' km em linha reta entre elas.';
+}
+
+function limparRota(){
+  if(rotaLayer){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
+  if(markerClusterGroup) markerClusterGroup.addTo(leafletMap);
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-limpar-rota').style.display = 'none';
+  document.getElementById('mapa-status').textContent = '';
 }
 
 document.getElementById('btn-atividade').addEventListener('click', abrirAtividade);
@@ -2368,6 +2512,8 @@ document.getElementById('btn-mapa').addEventListener('click', abrirMapa);
 document.getElementById('btn-fechar-mapa').addEventListener('click', ()=> document.getElementById('mapa-overlay').classList.remove('open'));
 document.getElementById('mapa-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'mapa-overlay') document.getElementById('mapa-overlay').classList.remove('open'); });
 document.getElementById('btn-geocodificar').addEventListener('click', geocodificarPendentes);
+document.getElementById('btn-rota-proximidade').addEventListener('click', calcularRotaProximidade);
+document.getElementById('btn-limpar-rota').addEventListener('click', limparRota);
 document.getElementById('btn-abrir-aviso').addEventListener('click', abrirFormAviso);
 document.getElementById('btn-cancelar-aviso').addEventListener('click', ()=> document.getElementById('aviso-form-overlay').classList.remove('open'));
 document.getElementById('btn-enviar-aviso-form').addEventListener('click', enviarAvisoGlobal);
@@ -2817,6 +2963,7 @@ function doLogout(){
   clearInterval(notifTimer);
   document.getElementById('notif-badge').style.display = 'none';
   notificacoesCache = [];
+  pararFlashNotificacao();
   clearInterval(avisoTimer);
   document.getElementById('aviso-banner').style.display = 'none';
   document.body.classList.remove('theme-admin');

@@ -632,17 +632,25 @@
 
 <div class="overlay" id="mapa-overlay">
   <div class="modal" style="max-width:min(1000px, 94vw); width:94vw; height:88vh; display:flex; flex-direction:column; padding:16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
       <h2 style="border:none; margin:0;">Mapa dos registros</h2>
-      <button class="secondary" id="btn-fechar-mapa">Fechar</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="secondary" id="btn-rota-proximidade">Rota por proximidade</button>
+        <button class="secondary" id="btn-limpar-rota" style="display:none;">Limpar rota</button>
+        <button class="secondary" id="btn-fechar-mapa">Fechar</button>
+      </div>
     </div>
-    <p style="margin:0 0 8px; font-size:12px; color:var(--ink-soft);">Mostra os registros com endereço já geocodificado, respeitando os filtros ativos.</p>
+    <p style="margin:0 0 8px; font-size:12px; color:var(--ink-soft);">Mostra os registros com endereço já geocodificado, respeitando os filtros ativos. "Rota por proximidade" ordena as vistorias <b>agendadas</b> visíveis pelo caminho mais curto estimado entre elas.</p>
     <div style="position:relative; flex:1;">
       <div id="mapa-container" style="position:absolute; inset:0; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);"></div>
       <div id="mapa-legenda" style="position:absolute; bottom:10px; left:10px; z-index:1000; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px; font-size:12px; box-shadow:0 2px 8px rgba(22,35,58,0.15);">
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:10px; height:10px; border-radius:50%; background:#C2792E; display:inline-block;"></span> Pendente</div>
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:10px; height:10px; border-radius:50%; background:#3B6E92; display:inline-block;"></span> Agendada</div>
         <div style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:50%; background:#4B7A5D; display:inline-block;"></span> Realizada</div>
+      </div>
+      <div id="mapa-rota-painel" style="display:none; position:absolute; top:10px; right:10px; z-index:1000; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; font-size:12px; box-shadow:0 2px 8px rgba(22,35,58,0.15); max-width:260px; max-height:calc(100% - 20px); overflow-y:auto;">
+        <b style="display:block; margin-bottom:6px;">Rota sugerida</b>
+        <ol id="mapa-rota-lista" style="margin:0; padding-left:18px;"></ol>
       </div>
     </div>
     <div class="status-msg" id="mapa-status"></div>

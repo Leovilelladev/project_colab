@@ -1447,21 +1447,45 @@ const TITULO_ORIGINAL = document.title;
 let notifFlashTimer = null;
 let notifFlashAceso = false;
 
-function faviconComPonto(hrefOriginal){
-  if(hrefOriginal.includes('cx=\'82\' cy=\'20\'')) return hrefOriginal;
-  return hrefOriginal.replace('%3C/svg%3E', "%3Ccircle cx='82' cy='20' r='16' fill='%23E14B3C' stroke='%23fff' stroke-width='3'/%3E%3C/svg%3E");
+const faviconPontoCache = {};
+
+function gerarFaviconComPonto(hrefOriginal, onReady){
+  if(faviconPontoCache[hrefOriginal]){ onReady(faviconPontoCache[hrefOriginal]); return; }
+  const img = new Image();
+  img.onload = () => {
+    try{
+      const size = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      ctx.beginPath();
+      ctx.arc(size*0.80, size*0.20, size*0.16, 0, Math.PI*2);
+      ctx.fillStyle = '#E14B3C';
+      ctx.fill();
+      ctx.lineWidth = size*0.05;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      const url = canvas.toDataURL('image/png');
+      faviconPontoCache[hrefOriginal] = url;
+      onReady(url);
+    }catch(e){ onReady(hrefOriginal); }
+  };
+  img.onerror = () => onReady(hrefOriginal);
+  img.src = hrefOriginal;
 }
 
 function iniciarFlashNotificacao(){
   if(notifFlashTimer) return;
   const faviconEl = document.getElementById('favicon');
   const faviconNormal = faviconEl.href;
-  const faviconPonto = faviconComPonto(faviconNormal);
   notifFlashAceso = false;
+  let faviconPonto = null;
+  gerarFaviconComPonto(faviconNormal, (url) => { faviconPonto = url; });
   notifFlashTimer = setInterval(()=>{
     notifFlashAceso = !notifFlashAceso;
     document.title = notifFlashAceso ? '🔴 Nova notificação' : TITULO_ORIGINAL;
-    faviconEl.href = notifFlashAceso ? faviconPonto : faviconNormal;
+    faviconEl.href = notifFlashAceso ? (faviconPonto || faviconNormal) : faviconNormal;
   }, 1200);
 }
 
@@ -2739,7 +2763,7 @@ function syncThemeVisuals(){
   atualizarVoyageScene3D(usar3D);
   document.getElementById('favicon').href = on
     ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230B0F17'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23C9A227' stroke-width='5'/%3E%3Cpolygon points='50,16 60,50 50,44 40,50' fill='%23C9A227'/%3E%3Cpolygon points='50,84 60,50 50,56 40,50' fill='%23C9A227' opacity='0.5'/%3E%3C/svg%3E"
-    : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2316233A'/%3E%3Ctext x='50' y='68' font-size='60' text-anchor='middle' fill='%23F7F5EF' font-family='monospace'%3EP%3C/text%3E%3C/svg%3E";
+    : "icons/favicon-32.png";
 }
 
 /* ===== Cena 3D do cabeçalho — tema Admin (bússola do viajante) ===== */

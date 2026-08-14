@@ -1875,17 +1875,38 @@ async function carregarNotaColab(){
       listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Este colab não possui anotações.</p>';
       return;
     }
+    const ICON_TRASH_NOTA = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
     listaEl.innerHTML = notas.map(n => {
       const autor = n.autor ? (equipe.nomeDe[n.autor] || n.autor) : '—';
       const foto = n.autor ? equipe.fotoDe[n.autor] : null;
       const cargo = n.autor ? equipe.cargoDe[n.autor] : null;
+      const btnExcluir = isAdmin()
+        ? '<button type="button" class="icon-btn" style="width:20px; height:20px; margin-left:auto; flex-shrink:0;" onclick="excluirNotaColab(\'' + n.id + '\')" title="Excluir anotação">' + ICON_TRASH_NOTA + '</button>'
+        : '';
       return '<div class="chat-bubble"><div class="chat-row">' + avatarHtml(autor, 'sm', foto, n.autor, cargo) +
-        '<div class="chat-body"><span class="chat-autor">' + escHtml(autor) + '</span>' + escHtml(n.mensagem) +
+        '<div class="chat-body"><div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">' +
+          '<span class="chat-autor">' + escHtml(autor) + '</span>' + btnExcluir +
+        '</div>' + escHtml(n.mensagem) +
         '<span class="chat-quando">' + new Date(n.criado_em).toLocaleString('pt-BR') + '</span></div></div></div>';
     }).join('');
     listaEl.scrollTop = listaEl.scrollHeight;
   }catch(e){
     listaEl.innerHTML = '<p style="color:var(--ink-soft); font-size:13px;">Não foi possível carregar as anotações.</p>';
+  }
+}
+
+async function excluirNotaColab(id){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir esta anotação?')) return;
+  try{
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_notas?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: supaHeaders()
+    });
+    if(!res.ok) throw new Error('falhou');
+    carregarNotaColab();
+  }catch(e){
+    alert('Não foi possível excluir a anotação.');
   }
 }
 

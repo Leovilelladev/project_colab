@@ -2358,6 +2358,40 @@ function updateBulkBar(){
   document.getElementById('btn-bulk-delete').style.display = editable ? '' : 'none';
 }
 
+function abrirBulkNota(){
+  if(selectedIds.size === 0) return;
+  document.getElementById('bulk-nota-contagem').textContent = 'Essa anotação vai ser adicionada a ' + selectedIds.size + ' registro(s) selecionado(s).';
+  document.getElementById('bulk-nota-texto').value = '';
+  document.getElementById('bulk-nota-msg').textContent = '';
+  document.getElementById('bulk-nota-overlay').classList.add('open');
+}
+
+async function enviarBulkNota(){
+  const msgEl = document.getElementById('bulk-nota-msg');
+  const texto = document.getElementById('bulk-nota-texto').value.trim();
+  if(!texto){ msgEl.textContent = 'Escreva uma anotação antes de enviar.'; return; }
+  if(selectedIds.size === 0){ msgEl.textContent = 'Nenhum registro selecionado.'; return; }
+
+  msgEl.textContent = 'Enviando…';
+  try{
+    const linhas = [...selectedIds].map(id => ({
+      id: uid(), registro_id: id, autor: currentUser ? currentUser.email : null, mensagem: texto
+    }));
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_notas', {
+      method: 'POST',
+      headers: supaHeaders({'Prefer':'return=minimal'}),
+      body: JSON.stringify(linhas)
+    });
+    if(!res.ok) throw new Error('falhou');
+    document.getElementById('bulk-nota-overlay').classList.remove('open');
+    selectedIds.clear();
+    renderTable();
+    updateBulkBar();
+  }catch(e){
+    msgEl.textContent = 'Não foi possível adicionar a anotação a todos os registros. Tente novamente.';
+  }
+}
+
 async function bulkApplyStatus(){
   if(!canEdit()) return;
   const status = document.getElementById('bulk-status').value;
@@ -2416,11 +2450,16 @@ document.getElementById('select-all-checkbox').addEventListener('change', (e)=>{
 
 document.getElementById('btn-bulk-apply-status').addEventListener('click', bulkApplyStatus);
 document.getElementById('btn-bulk-delete').addEventListener('click', bulkDelete);
+document.getElementById('btn-bulk-nota').addEventListener('click', abrirBulkNota);
 document.getElementById('btn-bulk-clear').addEventListener('click', ()=>{
   selectedIds.clear();
   renderTable();
   updateBulkBar();
 });
+
+document.getElementById('btn-cancelar-bulk-nota').addEventListener('click', ()=> document.getElementById('bulk-nota-overlay').classList.remove('open'));
+document.getElementById('btn-enviar-bulk-nota').addEventListener('click', enviarBulkNota);
+document.getElementById('bulk-nota-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'bulk-nota-overlay') document.getElementById('bulk-nota-overlay').classList.remove('open'); });
 
 ['f-status','f-tiposervico'].forEach(id=>{
   document.getElementById(id).addEventListener('change', ()=>{ page = 1; render(); });

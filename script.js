@@ -2180,6 +2180,7 @@ function abrirMapa(){
   document.getElementById('mapa-overlay').classList.add('open');
   document.getElementById('mapa-status').textContent = '';
   document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = 'none';
   document.getElementById('btn-limpar-rota').style.display = 'none';
   if(rotaLayer && leafletMap){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
 
@@ -2353,15 +2354,25 @@ function calcularRotaProximidade(){
   document.getElementById('mapa-rota-lista').innerHTML = rota.map((r, i) =>
     '<li style="margin-bottom:6px;"><b>' + escHtml(r.colab) + '</b><br>' + escHtml(r.endereco) + ' — ' + escHtml(r.bairro) + '</li>'
   ).join('');
-  document.getElementById('mapa-rota-painel').style.display = '';
+  document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = '';
+  document.getElementById('btn-toggle-rota-lista').textContent = 'Ver lista';
   document.getElementById('btn-limpar-rota').style.display = '';
-  document.getElementById('mapa-status').textContent = rota.length + ' parada(s) na rota — cerca de ' + distanciaTotal.toFixed(1) + ' km em linha reta entre elas.';
+  document.getElementById('mapa-status').textContent = rota.length + ' parada(s) na rota — cerca de ' + distanciaTotal.toFixed(1) + ' km em linha reta entre elas. Toque nos números no mapa (ou em "Ver lista") pra ver os endereços.';
+}
+
+function toggleRotaLista(){
+  const painel = document.getElementById('mapa-rota-painel');
+  const aberto = painel.style.display !== 'none';
+  painel.style.display = aberto ? 'none' : '';
+  document.getElementById('btn-toggle-rota-lista').textContent = aberto ? 'Ver lista' : 'Ocultar lista';
 }
 
 function limparRota(){
   if(rotaLayer){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
   if(markerClusterGroup) markerClusterGroup.addTo(leafletMap);
   document.getElementById('mapa-rota-painel').style.display = 'none';
+  document.getElementById('btn-toggle-rota-lista').style.display = 'none';
   document.getElementById('btn-limpar-rota').style.display = 'none';
   document.getElementById('mapa-status').textContent = '';
 }
@@ -2513,6 +2524,7 @@ document.getElementById('btn-fechar-mapa').addEventListener('click', ()=> docume
 document.getElementById('mapa-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'mapa-overlay') document.getElementById('mapa-overlay').classList.remove('open'); });
 document.getElementById('btn-geocodificar').addEventListener('click', geocodificarPendentes);
 document.getElementById('btn-rota-proximidade').addEventListener('click', calcularRotaProximidade);
+document.getElementById('btn-toggle-rota-lista').addEventListener('click', toggleRotaLista);
 document.getElementById('btn-limpar-rota').addEventListener('click', limparRota);
 document.getElementById('btn-abrir-aviso').addEventListener('click', abrirFormAviso);
 document.getElementById('btn-cancelar-aviso').addEventListener('click', ()=> document.getElementById('aviso-form-overlay').classList.remove('open'));

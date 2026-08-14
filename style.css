@@ -122,11 +122,12 @@
     border-radius:0 0 var(--radius) var(--radius); padding:12px 14px; margin-bottom:16px;
   }
   .filters-panel.open{display:flex;}
-  .filters-panel select{
+  .filters-panel select, .filters-panel input:not([type="checkbox"]){
     font-family:'IBM Plex Sans', sans-serif; font-size:13px;
     padding:7px 10px; border:1px solid var(--line); border-radius:var(--radius);
     background:#fff; color:var(--ink);
   }
+  .filters-panel input[type="checkbox"]{accent-color:var(--ink); cursor:pointer;}
 
   .date-popover{
     display:block; position:absolute; top:calc(100% + 6px); left:0; z-index:60;

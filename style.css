@@ -483,6 +483,9 @@
     /* cabeçalho: caixa do usuário pode quebrar linha em telas bem pequenas */
     .user-box{flex-wrap:wrap; justify-content:flex-end; row-gap:6px;}
 
+    /* barra de filtros empilhada fica alta demais pra ficar grudada no topo */
+    .toolbar{position:static; top:auto; backdrop-filter:none; -webkit-backdrop-filter:none;}
+
     /* alvos de toque um pouco maiores */
     .icon-btn{width:34px; height:34px;}
     button{padding:10px 14px;}

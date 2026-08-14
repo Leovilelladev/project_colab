@@ -806,16 +806,16 @@ async function fetchExistingColabSet(){
 
 async function fetchColabIdMap(){
   try{
-    const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=id,colab', { headers: supaHeaders() });
+    const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=id,colab,vistoria', { headers: supaHeaders() });
     if(!res.ok) throw new Error('fail');
     const data = await res.json();
-    const map = {};
-    data.forEach(r => { if(r.colab) map[normalizeColab(r.colab)] = r.id; });
-    return map;
+    const idDe = {}, vistoriaDe = {};
+    data.forEach(r => { if(r.colab){ const k = normalizeColab(r.colab); idDe[k] = r.id; vistoriaDe[k] = r.vistoria; } });
+    return { idDe, vistoriaDe };
   }catch(e){
-    const map = {};
-    records.forEach(r => { if(r.colab) map[normalizeColab(r.colab)] = r.id; });
-    return map;
+    const idDe = {}, vistoriaDe = {};
+    records.forEach(r => { if(r.colab){ const k = normalizeColab(r.colab); idDe[k] = r.id; vistoriaDe[k] = r.vistoria; } });
+    return { idDe, vistoriaDe };
   }
 }
 
@@ -942,7 +942,7 @@ async function mostrarPreviaImportacao(parsed, unrecognized){
     : '<div style="background:rgba(75,122,93,0.08); border:1px solid var(--green); border-radius:var(--radius); padding:10px 12px; margin-bottom:12px; font-size:13px; color:var(--green-dark);">Nenhum problema óbvio encontrado — mas dá uma conferida nas linhas abaixo mesmo assim.</div>';
 
   const contagemHtml = '<p style="font-size:12px; margin:0 0 10px;"><b>' + novosCount + '</b> Colab(s) novo(s) · <b>' + jaExistemCount + '</b> já cadastrado(s) (' +
-    (jaExistemCount > 0 ? 'serão <b>atualizados</b> se a opção acima estiver marcada, ou <b>pulados</b> se não estiver' : 'nenhum, tudo será cadastrado como novo') + ')</p>';
+    (jaExistemCount > 0 ? 'com a opção acima marcada, só os que tiverem <b>Vistoria diferente</b> da atual serão atualizados — o resto fica como está' : 'nenhum, tudo será cadastrado como novo') + ')</p>';
 
   const amostra = parsed.slice(0, 8);
   const linhasHtml = amostra.map(r => `
@@ -980,16 +980,21 @@ async function confirmarImportacao(){
   const statusEl = document.getElementById('import-status');
 
   statusEl.textContent = 'Verificando Colabs já cadastrados…';
-  const colabIdMap = await fetchColabIdMap();
+  const { idDe: colabIdMap, vistoriaDe } = await fetchColabIdMap();
   const seen = new Set(Object.keys(colabIdMap));
   const toInsert = [];
   const toUpdate = [];
   let skippedDup = 0;
+  let semMudanca = 0;
   parsed.forEach(rec => {
     const key = normalizeColab(rec.colab);
     if(key && colabIdMap[key]){
       if(modoAtualizacao){
-        toUpdate.push({ id: colabIdMap[key], vistoria: rec.vistoria });
+        if(vistoriaDe[key] === rec.vistoria){
+          semMudanca++;
+        } else {
+          toUpdate.push({ id: colabIdMap[key], vistoria: rec.vistoria });
+        }
       } else {
         skippedDup++;
       }
@@ -1000,7 +1005,10 @@ async function confirmarImportacao(){
   });
 
   if(toInsert.length === 0 && toUpdate.length === 0){
-    statusEl.textContent = 'Nenhum registro importado — todos os ' + skippedDup + ' número(s) de Colab já existiam.';
+    const motivos = [];
+    if(skippedDup > 0) motivos.push(skippedDup + ' já existiam');
+    if(semMudanca > 0) motivos.push(semMudanca + ' sem mudança de status');
+    statusEl.textContent = 'Nenhum registro importado — ' + (motivos.join(' · ') || 'nada a fazer') + '.';
     pendingImport = null;
     return;
   }
@@ -1044,6 +1052,7 @@ async function confirmarImportacao(){
     let resumo = [];
     if(inserted > 0) resumo.push(inserted + ' cadastrado(s)');
     if(updated > 0) resumo.push(updated + ' atualizado(s)');
+    if(semMudanca > 0) resumo.push(semMudanca + ' sem mudança (ignorado(s))');
     if(skippedDup > 0) resumo.push(skippedDup + ' pulado(s) por Colab duplicado');
     statusEl.textContent = resumo.join(' · ') + '.';
     await loadRecords();

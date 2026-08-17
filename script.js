@@ -597,13 +597,35 @@ document.getElementById('btn-densidade').addEventListener('click', ()=>{
   document.body.classList.toggle('compact-mode');
 });
 
+/* flyouts do rail (Busca, CSV, Admin) — só um aberto por vez */
+function fecharFlyoutsRail(exceto){
+  ['busca-flyout','csv-dropdown','admin-dropdown'].forEach(id=>{
+    if(id === exceto) return;
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('open');
+  });
+}
 document.getElementById('btn-admin-menu').addEventListener('click', (e)=>{
   e.stopPropagation();
-  document.getElementById('admin-dropdown').classList.toggle('open');
+  const el = document.getElementById('admin-dropdown');
+  const willOpen = !el.classList.contains('open');
+  fecharFlyoutsRail(willOpen ? 'admin-dropdown' : null);
+  el.classList.toggle('open', willOpen);
 });
 document.getElementById('btn-csv-menu').addEventListener('click', (e)=>{
   e.stopPropagation();
-  document.getElementById('csv-dropdown').classList.toggle('open');
+  const el = document.getElementById('csv-dropdown');
+  const willOpen = !el.classList.contains('open');
+  fecharFlyoutsRail(willOpen ? 'csv-dropdown' : null);
+  el.classList.toggle('open', willOpen);
+});
+document.getElementById('btn-busca-toggle').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const el = document.getElementById('busca-flyout');
+  const willOpen = !el.classList.contains('open');
+  fecharFlyoutsRail(willOpen ? 'busca-flyout' : null);
+  el.classList.toggle('open', willOpen);
+  if(willOpen) document.getElementById('f-busca').focus();
 });
 document.addEventListener('click', (e)=>{
   const dropdown = document.getElementById('admin-dropdown');
@@ -616,6 +638,35 @@ document.addEventListener('click', (e)=>{
   if(csvDropdown.classList.contains('open') && !csvDropdown.contains(e.target) && e.target !== csvBtn){
     csvDropdown.classList.remove('open');
   }
+  const buscaFlyout = document.getElementById('busca-flyout');
+  const buscaBtn = document.getElementById('btn-busca-toggle');
+  if(buscaFlyout.classList.contains('open') && !buscaFlyout.contains(e.target) && e.target !== buscaBtn){
+    buscaFlyout.classList.remove('open');
+  }
+});
+
+/* ===== Sidebar (menu lateral que substitui a antiga toolbar) ===== */
+function abrirSidebar(){
+  document.getElementById('app-sidebar').classList.add('open');
+  document.getElementById('sidebar-backdrop').classList.add('open');
+}
+function fecharSidebar(){
+  document.getElementById('app-sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+  fecharFlyoutsRail(null);
+}
+document.getElementById('btn-toggle-sidebar').addEventListener('click', ()=>{
+  document.getElementById('app-sidebar').classList.contains('open') ? fecharSidebar() : abrirSidebar();
+});
+document.getElementById('btn-close-sidebar').addEventListener('click', fecharSidebar);
+document.getElementById('sidebar-backdrop').addEventListener('click', fecharSidebar);
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar(); });
+/* ao escolher uma ação (abrir mapa, chamados, exportar csv...) a sidebar fecha sozinha */
+['btn-mapa','btn-chamados','btn-anotacoes','btn-relatorio-mensal','btn-export','btn-import',
+ 'btn-atividade','btn-historico','btn-backup','btn-restore','btn-geocodificar','btn-abrir-aviso','btn-toggle-filtros'
+].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('click', fecharSidebar);
 });
 
 function changePage(delta){ page += delta; renderTable(); }

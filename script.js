@@ -2110,7 +2110,7 @@ function selecionarMencao(nome){
 async function abrirHistorico(){
   document.getElementById('historico-overlay').classList.add('open');
   const tbody = document.getElementById('historico-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-pulse" style="text-align:center; padding:20px; color:var(--ink-soft);"><span class="loading-inline"><img src="icons/prumo-mascote.svg" alt="" width="18" height="18">Carregando…</span></td></tr>';
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/registros_excluidos?select=*&order=deletado_em.desc', {
       headers: supaHeaders()

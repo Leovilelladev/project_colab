@@ -2908,7 +2908,19 @@ function atualizarVoyageScene3D(ligar){
   else if(!voyage3D.raf) voyage3D.animar();
 }
 
+function atualizarSaudacao(){
+  const el = document.getElementById('greeting');
+  if(!el) return;
+  if(!currentUser){ el.textContent = ''; return; }
+  const hora = new Date().getHours();
+  const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const primeiroNome = (currentUser.nome || currentUser.email).split(' ')[0];
+  const dataFmt = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  el.textContent = `${saudacao}, ${primeiroNome} · ${dataFmt}`;
+}
+
 function applyRolePermissions(){
+  atualizarSaudacao();
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
   document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';

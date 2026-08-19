@@ -889,6 +889,47 @@ function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
+function exportarParaVistoria(){
+  if(selectedIds.size === 0) return;
+  const selecionados = records.filter(r => selectedIds.has(r.id));
+  const header = ['Colab', 'Responsavel', 'Bairro', 'Data da Vistoria', 'Vistoriador'];
+  const linhas = selecionados.map(r => [r.colab, r.responsavel, r.bairro, '', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...linhas]);
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  const bordaFina = {style:'thin', color:{rgb:'CCCCCC'}};
+  const estiloCabecalho = {
+    font:{bold:true, color:{rgb:'16233A'}},
+    fill:{fgColor:{rgb:'F0EDE3'}},
+    border:{top:bordaFina, bottom:bordaFina, left:bordaFina, right:bordaFina},
+    alignment:{vertical:'center'}
+  };
+  const estiloCelula = {
+    border:{top:bordaFina, bottom:bordaFina, left:bordaFina, right:bordaFina}
+  };
+
+  for(let c = range.s.c; c <= range.e.c; c++){
+    const addr = XLSX.utils.encode_cell({r:0, c});
+    if(ws[addr]) ws[addr].s = estiloCabecalho;
+  }
+  for(let r = 1; r <= range.e.r; r++){
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const addr = XLSX.utils.encode_cell({r, c});
+      if(!ws[addr]) ws[addr] = {t:'s', v:''};
+      ws[addr].s = estiloCelula;
+    }
+  }
+
+  ws['!cols'] = [{wch:10}, {wch:16}, {wch:16}, {wch:18}, {wch:18}];
+  ws['!autofilter'] = {ref: ws['!ref']};
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Vistoria');
+  const hoje = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `vistoria_${hoje}.xlsx`);
+}
+
 function normalizeColab(v){
   return String(v || '').trim().toLowerCase();
 }
@@ -2764,6 +2805,7 @@ document.getElementById('select-all-checkbox').addEventListener('change', (e)=>{
 document.getElementById('btn-bulk-apply-status').addEventListener('click', bulkApplyStatus);
 document.getElementById('btn-bulk-delete').addEventListener('click', bulkDelete);
 document.getElementById('btn-bulk-nota').addEventListener('click', abrirBulkNota);
+document.getElementById('btn-bulk-vistoria').addEventListener('click', exportarParaVistoria);
 document.getElementById('btn-bulk-clear').addEventListener('click', ()=>{
   selectedIds.clear();
   renderTable();

@@ -769,9 +769,28 @@ document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar
 // Avança/retrocede a paginação da tabela (delta = +1 ou -1) e redesenha só a tabela
 function changePage(delta){ page += delta; renderTable(); }
 
+// Lê a paleta ativa para que gráficos, mapa e indicadores acompanhem o tema sem cores hardcoded
+function getThemeChartColors(){
+  const css = getComputedStyle(document.body);
+  const read = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+  const escuro = document.body.classList.contains('theme-admin');
+  return {
+    blue: read('--blue', '#3B6E92'),
+    green: read('--green', '#4B7A5D'),
+    ochre: read('--ochre', '#C2792E'),
+    red: read('--red', '#A6402F'),
+    neutral: read('--ink-soft', '#3C4F6B'),
+    text: read('--ink-soft', '#3C4F6B'),
+    grid: escuro ? 'rgba(154,174,170,0.16)' : 'rgba(60,79,107,0.14)'
+  };
+}
+
 // Recalcula os totais por bairro, status, responsável e tipo de serviço e (re)desenha os 4 gráficos (Chart.js)
 function renderCharts(){
   const filtered = getFiltered();
+  const cores = getThemeChartColors();
+  Chart.defaults.color = cores.text;
+  Chart.defaults.borderColor = cores.grid;
 
   const byBairro = {};
   filtered.forEach(r=>{ const k = r.bairro || 'Sem bairro'; byBairro[k] = (byBairro[k]||0)+1; });
@@ -803,25 +822,25 @@ function renderCharts(){
 
   chartBairro = new Chart(document.getElementById('chart-bairro'), {
     type: 'bar',
-    data: { labels: bairroEntries.map(e=>e[0]), datasets: [{ data: bairroEntries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
+    data: { labels: bairroEntries.map(e=>e[0]), datasets: [{ data: bairroEntries.map(e=>e[1]), backgroundColor: cores.blue }] },
     options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartStatus = new Chart(document.getElementById('chart-status'), {
     type: 'doughnut',
-    data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[byStatus.pendente, byStatus.agendada, byStatus.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
+    data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[byStatus.pendente, byStatus.agendada, byStatus.realizada], backgroundColor:[cores.ochre,cores.blue,cores.green] }] },
     options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartColab = new Chart(document.getElementById('chart-colab'), {
     type: 'bar',
-    data: { labels: responsavelEntries.map(e=>e[0]), datasets: [{ data: responsavelEntries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
+    data: { labels: responsavelEntries.map(e=>e[0]), datasets: [{ data: responsavelEntries.map(e=>e[1]), backgroundColor: cores.green }] },
     options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 
   chartTipoServico = new Chart(document.getElementById('chart-tiposervico'), {
     type: 'doughnut',
-    data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[byTipoServico.pavimentacao, byTipoServico.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
+    data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[byTipoServico.pavimentacao, byTipoServico.obra_civil], backgroundColor:[cores.red,cores.neutral] }] },
     options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
   });
 }
@@ -829,6 +848,9 @@ function renderCharts(){
 // Abre o modal de gráfico "ampliado", redesenhando o mesmo gráfico em tamanho maior usando os dados em cache
 function ampliarGrafico(tipo){
   const titulos = { bairro:'Por bairro', status:'Status da vistoria', responsavel:'Por responsável', tiposervico:'Tipo de serviço' };
+  const cores = getThemeChartColors();
+  Chart.defaults.color = cores.text;
+  Chart.defaults.borderColor = cores.grid;
   document.getElementById('chart-zoom-titulo').textContent = titulos[tipo];
   document.getElementById('chart-zoom-overlay').classList.add('open');
 
@@ -839,28 +861,28 @@ function ampliarGrafico(tipo){
     const entries = graficoDadosCache.bairro || [];
     chartZoom = new Chart(ctx, {
       type: 'bar',
-      data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#3B6E92' }] },
+      data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: cores.blue }] },
       options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'responsavel'){
     const entries = graficoDadosCache.responsavel || [];
     chartZoom = new Chart(ctx, {
       type: 'bar',
-      data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: '#4B7A5D' }] },
+      data: { labels: entries.map(e=>e[0]), datasets: [{ data: entries.map(e=>e[1]), backgroundColor: cores.green }] },
       options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{precision:0}}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'status'){
     const s = graficoDadosCache.status || {pendente:0, agendada:0, realizada:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
-      data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[s.pendente, s.agendada, s.realizada], backgroundColor:['#C2792E','#3B6E92','#4B7A5D'] }] },
+      data: { labels: ['Pendente','Agendada','Realizada'], datasets: [{ data:[s.pendente, s.agendada, s.realizada], backgroundColor:[cores.ochre,cores.blue,cores.green] }] },
       options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   } else if(tipo === 'tiposervico'){
     const t = graficoDadosCache.tiposervico || {pavimentacao:0, obra_civil:0};
     chartZoom = new Chart(ctx, {
       type: 'doughnut',
-      data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[t.pavimentacao, t.obra_civil], backgroundColor:['#A6402F','#3C4F6B'] }] },
+      data: { labels: ['Pavimentação','Obra Civil'], datasets: [{ data:[t.pavimentacao, t.obra_civil], backgroundColor:[cores.red,cores.neutral] }] },
       options: { plugins:{legend:{position:'bottom'}}, responsive:true, maintainAspectRatio:false, animation:{duration:650, easing:'easeOutQuart'} }
     });
   }
@@ -1579,9 +1601,12 @@ function renderizarAtividade(){
 
   if(atividadeChart) atividadeChart.destroy();
   if(total > 0){
+    const cores = getThemeChartColors();
+    Chart.defaults.color = cores.text;
+    Chart.defaults.borderColor = cores.grid;
     atividadeChart = new Chart(document.getElementById('atividade-chart'), {
       type: 'doughnut',
-      data: { labels: ['Criado','Editado','Excluído'], datasets: [{ data: [nCriado, nEditado, nExcluido], backgroundColor: ['#4B7A5D','#3B6E92','#A6402F'], borderWidth: 0 }] },
+      data: { labels: ['Criado','Editado','Excluído'], datasets: [{ data: [nCriado, nEditado, nExcluido], backgroundColor: [cores.green,cores.blue,cores.red], borderWidth: 0 }] },
       options: { cutout: '62%', plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false }
     });
   }
@@ -2527,11 +2552,11 @@ async function restaurarBackup(file){
 let leafletMap = null;
 let markerClusterGroup = null;
 
-const MARKER_COLORS = { pendente: '#C2792E', agendada: '#3B6E92', realizada: '#4B7A5D' };
-
 // Cria o ícone de marcador (gota colorida) de acordo com o status da vistoria
 function statusIcon(status){
-  const color = MARKER_COLORS[status] || '#3C4F6B';
+  const cores = getThemeChartColors();
+  const markerColors = { pendente: cores.ochre, agendada: cores.blue, realizada: cores.green };
+  const color = markerColors[status] || cores.neutral;
   return L.divIcon({
     className: 'status-marker',
     html: '<div style="background:' + color + '; width:16px; height:16px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.45);"></div>',
@@ -2563,7 +2588,8 @@ function abrirMapa(){
         const counts = { pendente: 0, agendada: 0, realizada: 0 };
         childMarkers.forEach(m => { if(counts[m.options.vistoriaStatus] !== undefined) counts[m.options.vistoriaStatus]++; });
         const dominant = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
-        const color = MARKER_COLORS[dominant] || '#3C4F6B';
+        const cores = getThemeChartColors();
+        const color = { pendente: cores.ochre, agendada: cores.blue, realizada: cores.green }[dominant] || cores.neutral;
         return L.divIcon({
           html: '<div style="background:' + color + '; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:IBM Plex Mono, monospace; font-weight:600; font-size:12px; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.4);">' + cluster.getChildCount() + '</div>',
           className: '',
@@ -3150,18 +3176,17 @@ function updateSortIndicators(){
 updateSortIndicators();
 popularBairros();
 
-/* ===== Tema visual "Admin" (modo escuro decorado com cena 3D no cabeçalho) ===== */
-// Ajusta os elementos visuais (ícone do usuário, favicon, cena 3D) de acordo com o tema ativo e se o usuário tem foto
+/* ===== Tema visual "Admin" (modo escuro sóbrio, com identidade de bancada operacional) ===== */
+// Ajusta os elementos visuais do tema e mantém a decoração do cabeçalho deliberadamente discreta
 function syncThemeVisuals(){
   const on = document.body.classList.contains('theme-admin');
   const temFoto = !!(currentUser && currentUser.avatarUrl);
   document.getElementById('user-box-icon').style.display = (on || temFoto) ? 'none' : '';
   document.getElementById('user-box-icon-admin').style.display = (on && !temFoto) ? '' : 'none';
-  const usar3D = on && typeof THREE !== 'undefined';
-  document.getElementById('voyage-scene').style.display = (on && !usar3D) ? 'block' : 'none';
-  atualizarVoyageScene3D(usar3D);
+  document.getElementById('voyage-scene').style.display = 'none';
+  atualizarVoyageScene3D(false);
   document.getElementById('favicon').href = on
-    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230B0F17'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23C9A227' stroke-width='5'/%3E%3Cpolygon points='50,16 60,50 50,44 40,50' fill='%23C9A227'/%3E%3Cpolygon points='50,84 60,50 50,56 40,50' fill='%23C9A227' opacity='0.5'/%3E%3C/svg%3E"
+    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230E1617'/%3E%3Crect x='22' y='18' width='56' height='64' rx='8' fill='none' stroke='%23D78B52' stroke-width='7'/%3E%3Cpath d='M36 40h28M36 54h28M36 68h16' stroke='%2378B1B0' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E"
     : "icons/favicon-32.png";
 }
 
@@ -3337,11 +3362,12 @@ function applyRolePermissions(){
   syncThemeVisuals();
 }
 
-// (Só admin) Alterna manualmente entre o tema normal e o tema "Admin" (decorado)
+// (Só admin) Alterna manualmente entre o tema normal e o tema "Admin" (bancada noturna)
 function toggleTheme(){
   if(!isAdmin()) return;
   document.body.classList.toggle('theme-admin');
   syncThemeVisuals();
+  render();
 }
 
 /* ===== Autenticação ===== */

@@ -690,102 +690,98 @@
     .empty-row td{display:block !important; text-align:center; padding:36px 12px;}
   }
 
-  /* ===== Tema Admin — capitão noturno / bússola do viajante =====
-     Técnica: redefine as MESMAS variáveis de --root dentro de "body.theme-admin", então qualquer
-     componente que já usa var(--ink), var(--paper) etc. muda de cor sozinho quando essa classe é ativada
-     (ver toggleTheme() e syncThemeVisuals() no script.js). */
+  /* ===== Tema Admin — bancada noturna =====
+     Uma paleta de carvão, verde-petróleo e terracota, inspirada em pranchetas e sinalização de obra.
+     O tema reaproveita as mesmas variáveis do tema claro sem depender de efeitos decorativos. */
   body.theme-admin{
-    --ink:#E8E1CD;
-    --ink-soft:#8FA0AE;
-    --paper:#0B0F17;
-    --paper-2:#141B27;
-    --line:#2B3B4E;
-    --blue:#3E93A8;
-    --blue-dark:#1F4C5A;
-    --ochre:#C9A227;
-    --ochre-dark:#7A611A;
-    --green:#3F9E7B;
-    --green-dark:#1F5C46;
-    --red:#A13A3A;
-    --red-dark:#6B2424;
-    --pendente:#B8722E;
-    --pendente-dark:#7A4A1E;
+    --ink:#EEE8DA;
+    --ink-soft:#9AAEAA;
+    --paper:#0E1617;
+    --paper-2:#182425;
+    --line:#304544;
+    --blue:#78B1B0;
+    --blue-dark:#315F60;
+    --ochre:#D78B52;
+    --ochre-dark:#8A4C2E;
+    --green:#81AD8C;
+    --green-dark:#39614A;
+    --red:#D27A69;
+    --red-dark:#783B34;
+    --pendente:#D09252;
+    --pendente-dark:#844B2A;
+    --radius:8px;
   }
   body.theme-admin{
-    background-image:radial-gradient(rgba(201,162,39,0.05) 1px, transparent 1px);
-    background-size:22px 22px;
-    scrollbar-color:var(--ochre) var(--paper-2);
+    background-image:linear-gradient(180deg, #0E1617 0%, #111C1D 100%);
+    scrollbar-color:var(--blue-dark) var(--paper-2);
   }
   body.theme-admin::-webkit-scrollbar{width:12px; height:12px;}
   body.theme-admin::-webkit-scrollbar-track{background:var(--paper-2);}
-  body.theme-admin::-webkit-scrollbar-thumb{background:var(--ochre-dark); border-radius:8px; border:2px solid var(--paper-2);}
-  body.theme-admin::-webkit-scrollbar-thumb:hover{background:var(--ochre);}
-  body.theme-admin .table-scroll{scrollbar-color:var(--ochre) var(--paper-2);}
+  body.theme-admin::-webkit-scrollbar-thumb{background:var(--blue-dark); border-radius:8px; border:2px solid var(--paper-2);}
+  body.theme-admin::-webkit-scrollbar-thumb:hover{background:var(--blue);}
+  body.theme-admin .table-scroll{scrollbar-color:var(--blue-dark) var(--paper-2);}
   body.theme-admin .table-scroll::-webkit-scrollbar{height:10px;}
   body.theme-admin .table-scroll::-webkit-scrollbar-track{background:var(--paper-2);}
-  body.theme-admin .table-scroll::-webkit-scrollbar-thumb{background:var(--ochre-dark); border-radius:8px;}
-  body.theme-admin thead th{background:#080B10; color:var(--ink);}
-  body.theme-admin thead th:hover{background:#1B2531;}
-  body.theme-admin tbody tr:hover{background:#182029;}
+  body.theme-admin .table-scroll::-webkit-scrollbar-thumb{background:var(--blue-dark); border-radius:8px;}
+  body.theme-admin thead th{background:#101B1C; color:var(--ink);}
+  body.theme-admin thead th:hover{background:#213333;}
+  body.theme-admin tbody tr:hover{background:#1E3030;}
   body.theme-admin header{
-    position:relative; overflow:hidden;
-    border-bottom:2px solid var(--line);
-    padding:22px 20px; border-radius:var(--radius) var(--radius) 0 0;
-    min-height:110px;
+    position:relative; overflow:hidden; background:linear-gradient(135deg, #1B2B2B 0%, #142122 100%);
+    border:1px solid var(--line); border-bottom:3px solid var(--ochre);
+    padding:18px 20px; border-radius:var(--radius);
+    min-height:92px; box-shadow:0 8px 24px rgba(0,0,0,0.16);
   }
   body.theme-admin header > div, body.theme-admin header .user-box{position:relative; z-index:2;}
   body.theme-admin header h1{
-    font-family:'Cinzel', serif; font-weight:600; letter-spacing:0.5px; color:var(--ink);
-    text-shadow:0 2px 6px rgba(0,0,0,0.6);
+    font-family:'IBM Plex Mono', monospace; font-size:20px; font-weight:600; letter-spacing:0.1px; color:var(--ink);
+    text-shadow:none;
   }
-  body.theme-admin .voyage-scene{
-    display:block; position:absolute; inset:0; width:100%; height:100%;
-    z-index:0; pointer-events:none;
-  }
-  body.theme-admin .voyage-scene-3d{
-    position:absolute; inset:0; width:100%; height:100%;
-    z-index:0; pointer-events:none;
-  }
+  body.theme-admin .voyage-scene, body.theme-admin .voyage-scene-3d{display:none !important;}
   body.theme-admin .avatar-3d{
-    border:1px solid rgba(201,162,39,0.55);
-    box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(201,162,39,0.12);
+    border:1px solid rgba(120,177,176,0.65);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(120,177,176,0.10);
   }
   body.theme-admin .avatar-3d:hover{
-    box-shadow:inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 10px rgba(201,162,39,0.5);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 8px rgba(120,177,176,0.28);
   }
   body.theme-admin header::before{
-    content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
-    background:linear-gradient(90deg, rgba(11,15,23,0.72) 0%, rgba(11,15,23,0.42) 42%, rgba(11,15,23,0.08) 75%);
+    content:''; position:absolute; left:0; top:0; bottom:0; width:5px; z-index:1; pointer-events:none;
+    background:var(--ochre);
   }
-  body.theme-admin .user-box{border-color:var(--line); background:rgba(20,27,39,0.85);}
+  body.theme-admin header::after{
+    content:''; position:absolute; left:20px; right:20px; bottom:8px; height:2px; z-index:1; pointer-events:none;
+    background:linear-gradient(90deg, var(--ochre) 0 72px, transparent 72px 80px, var(--blue) 80px 164px, transparent 164px 100%);
+    opacity:0.75;
+  }
+  body.theme-admin .user-box{border-color:var(--line); background:rgba(14,22,23,0.78);}
   body.theme-admin button:not(.secondary){
-    background:var(--ochre); color:#20190A; border-color:var(--ochre); font-weight:600;
+    background:var(--ochre); color:#241914; border-color:var(--ochre); font-weight:600;
   }
-  body.theme-admin button:not(.secondary):hover{background:#DDB94A;}
-  body.theme-admin .stamp.pendente{color:var(--pendente); border-color:var(--pendente); background:rgba(184,114,46,0.18);}
-  body.theme-admin .stamp.agendada{color:var(--blue); border-color:var(--blue); background:rgba(62,147,168,0.16);}
-  body.theme-admin .stamp.realizada{color:var(--green); border-color:var(--green); background:rgba(63,158,123,0.16);}
-  body.theme-admin .stamp.pavimentacao{color:var(--red); border-color:var(--red); background:rgba(161,58,58,0.18);}
-  body.theme-admin .stamp.obra_civil{color:var(--ink); border-color:var(--ink-soft); background:rgba(232,225,205,0.07);}
+  body.theme-admin button:not(.secondary):hover{background:#E2A16D;}
+  body.theme-admin .stamp.pendente{color:var(--pendente); border-color:var(--pendente); background:rgba(208,146,82,0.12);}
+  body.theme-admin .stamp.agendada{color:var(--blue); border-color:var(--blue); background:rgba(120,177,176,0.12);}
+  body.theme-admin .stamp.realizada{color:var(--green); border-color:var(--green); background:rgba(129,173,140,0.12);}
+  body.theme-admin .stamp.pavimentacao{color:var(--red); border-color:var(--red); background:rgba(210,122,105,0.12);}
+  body.theme-admin .stamp.obra_civil{color:var(--ink); border-color:var(--ink-soft); background:rgba(238,232,218,0.06);}
   body.theme-admin input, body.theme-admin select, body.theme-admin textarea{
-    background:#0D131C; color:var(--ink); border-color:var(--line);
+    background:#101B1C; color:var(--ink); border-color:var(--line);
   }
   body.theme-admin .filters-panel, body.theme-admin .table-card,
   body.theme-admin .chart-card, body.theme-admin .stat, body.theme-admin .modal,
-  body.theme-admin .date-popover, body.theme-admin .admin-dropdown, body.theme-admin .bulk-colab-flyout{
+  body.theme-admin .date-popover, body.theme-admin .admin-dropdown, body.theme-admin .bulk-colab-flyout,
+  body.theme-admin .rail-flyout{
     background:var(--paper-2); border-color:var(--line);
   }
   body.theme-admin .toolbar{
-    background:rgba(20,27,39,0.72); border-color:var(--line);
+    background:rgba(24,36,37,0.86); border-color:var(--line);
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
   }
   body.theme-admin .app-sidebar{background:var(--paper-2); border-color:var(--line);}
   body.theme-admin .app-sidebar-header{border-color:var(--line);}
-  body.theme-admin .icon-btn{background:#0D131C; border-color:var(--line); color:var(--ink-soft);}
+  body.theme-admin .icon-btn{background:#101B1C; border-color:var(--line); color:var(--ink-soft);}
   body.theme-admin .icon-btn:hover{color:var(--ochre); border-color:var(--ochre);}
-  body.theme-admin button svg{transition:transform 0.35s ease;}
-  body.theme-admin button:hover svg{transform:rotate(28deg);}
-  body.theme-admin #compass-badge-icon, body.theme-admin #user-box-icon-admin{transition:transform 0.35s ease;}
-  body.theme-admin .user-box:hover #user-box-icon-admin{transform:rotate(35deg);}
-  body.theme-admin .compass-badge{color:var(--ochre);}
+  body.theme-admin button svg{transition:none;}
+  body.theme-admin button:hover svg{transform:none;}
+  body.theme-admin .admin-badge{color:var(--ochre);}
   body.theme-admin .footnote, body.theme-admin p{color:var(--ink-soft);}

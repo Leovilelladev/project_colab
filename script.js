@@ -3186,7 +3186,7 @@ function syncThemeVisuals(){
   document.getElementById('voyage-scene').style.display = 'none';
   atualizarVoyageScene3D(false);
   document.getElementById('favicon').href = on
-    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230E1617'/%3E%3Crect x='22' y='18' width='56' height='64' rx='8' fill='none' stroke='%23D78B52' stroke-width='7'/%3E%3Cpath d='M36 40h28M36 54h28M36 68h16' stroke='%2378B1B0' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E"
+    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23080D1A'/%3E%3Crect x='22' y='18' width='56' height='64' rx='8' fill='none' stroke='%23BEA2FF' stroke-width='7'/%3E%3Cpath d='M36 40h28M36 54h28M36 68h16' stroke='%236BD1D8' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E"
     : "icons/favicon-32.png";
 }
 

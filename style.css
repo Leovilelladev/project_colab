@@ -691,28 +691,28 @@
   }
 
   /* ===== Tema Admin — bancada noturna =====
-     Uma paleta de carvão, verde-petróleo e terracota, inspirada em pranchetas e sinalização de obra.
+     Uma paleta de azul-noite, ciano e lilás, inspirada em painéis de anime técnico e fichas de missão.
      O tema reaproveita as mesmas variáveis do tema claro sem depender de efeitos decorativos. */
   body.theme-admin{
-    --ink:#EEE8DA;
-    --ink-soft:#9AAEAA;
-    --paper:#0E1617;
-    --paper-2:#182425;
-    --line:#304544;
-    --blue:#78B1B0;
-    --blue-dark:#315F60;
-    --ochre:#D78B52;
-    --ochre-dark:#8A4C2E;
-    --green:#81AD8C;
-    --green-dark:#39614A;
-    --red:#D27A69;
-    --red-dark:#783B34;
-    --pendente:#D09252;
-    --pendente-dark:#844B2A;
-    --radius:8px;
+    --ink:#F1F3FF;
+    --ink-soft:#9AA9C5;
+    --paper:#080D1A;
+    --paper-2:#121B30;
+    --line:#2C3E5E;
+    --blue:#6BD1D8;
+    --blue-dark:#2E6B79;
+    --ochre:#BEA2FF;
+    --ochre-dark:#6C4D9A;
+    --green:#88D4A1;
+    --green-dark:#39715A;
+    --red:#FF99A6;
+    --red-dark:#8D4055;
+    --pendente:#F0B56D;
+    --pendente-dark:#9A5E32;
+    --radius:10px;
   }
   body.theme-admin{
-    background-image:linear-gradient(180deg, #0E1617 0%, #111C1D 100%);
+    background-image:radial-gradient(circle at 8% 0%, rgba(107,209,216,0.08), transparent 26%), radial-gradient(circle at 92% 10%, rgba(190,162,255,0.10), transparent 28%), linear-gradient(180deg, #080D1A 0%, #0C1223 100%);
     scrollbar-color:var(--blue-dark) var(--paper-2);
   }
   body.theme-admin::-webkit-scrollbar{width:12px; height:12px;}
@@ -723,49 +723,53 @@
   body.theme-admin .table-scroll::-webkit-scrollbar{height:10px;}
   body.theme-admin .table-scroll::-webkit-scrollbar-track{background:var(--paper-2);}
   body.theme-admin .table-scroll::-webkit-scrollbar-thumb{background:var(--blue-dark); border-radius:8px;}
-  body.theme-admin thead th{background:#101B1C; color:var(--ink);}
-  body.theme-admin thead th:hover{background:#213333;}
-  body.theme-admin tbody tr:hover{background:#1E3030;}
+  body.theme-admin thead th{background:#0E172A; color:var(--ink);}
+  body.theme-admin thead th:hover{background:#1B2B49;}
+  body.theme-admin tbody tr:hover{background:#192643;}
   body.theme-admin header{
-    position:relative; overflow:hidden; background:linear-gradient(135deg, #1B2B2B 0%, #142122 100%);
-    border:1px solid var(--line); border-bottom:3px solid var(--ochre);
-    padding:18px 20px; border-radius:var(--radius);
-    min-height:92px; box-shadow:0 8px 24px rgba(0,0,0,0.16);
+    position:relative; overflow:hidden;
+    background:linear-gradient(135deg, rgba(19,31,55,0.98), rgba(10,17,34,0.99)) padding-box,
+      linear-gradient(115deg, rgba(107,209,216,0.9), rgba(190,162,255,0.8), rgba(107,209,216,0.24)) border-box;
+    background-clip:padding-box, border-box;
+    border:1px solid transparent; border-bottom:1px solid rgba(107,209,216,0.45);
+    padding:18px 20px; border-radius:16px 5px 16px 5px;
+    min-height:92px; box-shadow:12px 12px 0 rgba(18,27,48,0.72), 0 12px 28px rgba(0,0,0,0.28);
   }
   body.theme-admin header > div, body.theme-admin header .user-box{position:relative; z-index:2;}
   body.theme-admin header h1{
-    font-family:'IBM Plex Mono', monospace; font-size:20px; font-weight:600; letter-spacing:0.1px; color:var(--ink);
+    font-family:'IBM Plex Mono', monospace; font-size:20px; font-weight:600; letter-spacing:0.3px; color:var(--ink);
     text-shadow:none;
   }
   body.theme-admin .voyage-scene, body.theme-admin .voyage-scene-3d{display:none !important;}
+  body.theme-admin .header-mascot{filter:hue-rotate(210deg) saturate(1.35) brightness(1.08);}
   body.theme-admin .avatar-3d{
-    border:1px solid rgba(120,177,176,0.65);
-    box-shadow:inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(120,177,176,0.10);
+    border:1px solid rgba(107,209,216,0.65);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(107,209,216,0.10);
   }
   body.theme-admin .avatar-3d:hover{
-    box-shadow:inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 8px rgba(120,177,176,0.28);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35), 0 0 8px rgba(107,209,216,0.28);
   }
   body.theme-admin header::before{
-    content:''; position:absolute; left:0; top:0; bottom:0; width:5px; z-index:1; pointer-events:none;
-    background:var(--ochre);
+    content:''; position:absolute; left:0; top:0; bottom:0; width:4px; z-index:1; pointer-events:none;
+    background:var(--blue);
   }
   body.theme-admin header::after{
     content:''; position:absolute; left:20px; right:20px; bottom:8px; height:2px; z-index:1; pointer-events:none;
-    background:linear-gradient(90deg, var(--ochre) 0 72px, transparent 72px 80px, var(--blue) 80px 164px, transparent 164px 100%);
+    background:linear-gradient(90deg, var(--blue) 0 72px, transparent 72px 80px, var(--ochre) 80px 164px, transparent 164px 100%);
     opacity:0.75;
   }
-  body.theme-admin .user-box{border-color:var(--line); background:rgba(14,22,23,0.78);}
-  body.theme-admin button:not(.secondary){
-    background:var(--ochre); color:#241914; border-color:var(--ochre); font-weight:600;
+  body.theme-admin .user-box{border-color:transparent; background:transparent; padding:4px 0;}
+  body.theme-admin button:not(.secondary):not(.icon-btn){
+    background:var(--ochre); color:#18112E; border-color:var(--ochre); font-weight:600;
   }
-  body.theme-admin button:not(.secondary):hover{background:#E2A16D;}
-  body.theme-admin .stamp.pendente{color:var(--pendente); border-color:var(--pendente); background:rgba(208,146,82,0.12);}
-  body.theme-admin .stamp.agendada{color:var(--blue); border-color:var(--blue); background:rgba(120,177,176,0.12);}
-  body.theme-admin .stamp.realizada{color:var(--green); border-color:var(--green); background:rgba(129,173,140,0.12);}
-  body.theme-admin .stamp.pavimentacao{color:var(--red); border-color:var(--red); background:rgba(210,122,105,0.12);}
-  body.theme-admin .stamp.obra_civil{color:var(--ink); border-color:var(--ink-soft); background:rgba(238,232,218,0.06);}
+  body.theme-admin button:not(.secondary):not(.icon-btn):hover{background:#CFB8FF;}
+  body.theme-admin .stamp.pendente{color:var(--pendente); border-color:var(--pendente); background:rgba(240,181,109,0.12);}
+  body.theme-admin .stamp.agendada{color:var(--blue); border-color:var(--blue); background:rgba(107,209,216,0.12);}
+  body.theme-admin .stamp.realizada{color:var(--green); border-color:var(--green); background:rgba(136,212,161,0.12);}
+  body.theme-admin .stamp.pavimentacao{color:var(--red); border-color:var(--red); background:rgba(255,153,166,0.12);}
+  body.theme-admin .stamp.obra_civil{color:var(--ink); border-color:var(--ink-soft); background:rgba(241,243,255,0.06);}
   body.theme-admin input, body.theme-admin select, body.theme-admin textarea{
-    background:#101B1C; color:var(--ink); border-color:var(--line);
+    background:#0F172A; color:var(--ink); border-color:var(--line);
   }
   body.theme-admin .filters-panel, body.theme-admin .table-card,
   body.theme-admin .chart-card, body.theme-admin .stat, body.theme-admin .modal,
@@ -779,8 +783,8 @@
   }
   body.theme-admin .app-sidebar{background:var(--paper-2); border-color:var(--line);}
   body.theme-admin .app-sidebar-header{border-color:var(--line);}
-  body.theme-admin .icon-btn{background:#101B1C; border-color:var(--line); color:var(--ink-soft);}
-  body.theme-admin .icon-btn:hover{color:var(--ochre); border-color:var(--ochre);}
+  body.theme-admin .icon-btn{background:#182542; border-color:#35496B; color:#C7BAFF; border-radius:10px;}
+  body.theme-admin .icon-btn:hover{color:var(--blue); border-color:var(--blue); background:#203458;}
   body.theme-admin button svg{transition:none;}
   body.theme-admin button:hover svg{transform:none;}
   body.theme-admin .admin-badge{color:var(--ochre);}

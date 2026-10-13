@@ -676,7 +676,7 @@ document.getElementById('btn-densidade').addEventListener('click', ()=>{
 
 /* flyouts do rail (Busca, CSV, Admin) — só um aberto por vez */
 function fecharFlyoutsRail(exceto){
-  ['busca-flyout','csv-dropdown','admin-dropdown'].forEach(id=>{
+  ['busca-flyout','csv-dropdown','bulk-colab-flyout','admin-dropdown'].forEach(id=>{
     if(id === exceto) return;
     const el = document.getElementById(id);
     if(el) el.classList.remove('open');
@@ -698,6 +698,15 @@ document.getElementById('btn-csv-menu').addEventListener('click', (e)=>{
   fecharFlyoutsRail(willOpen ? 'csv-dropdown' : null);
   el.classList.toggle('open', willOpen);
 });
+// Abre/fecha o flyout compacto de alteração de status por Colab
+document.getElementById('btn-bulk-colab-menu').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const el = document.getElementById('bulk-colab-flyout');
+  const willOpen = !el.classList.contains('open');
+  fecharFlyoutsRail(willOpen ? 'bulk-colab-flyout' : null);
+  el.classList.toggle('open', willOpen);
+  if(willOpen) document.getElementById('bulk-colab-input').focus();
+});
 // Abre/fecha o flyout de busca rápida e foca o campo de texto ao abrir
 document.getElementById('btn-busca-toggle').addEventListener('click', (e)=>{
   e.stopPropagation();
@@ -707,7 +716,7 @@ document.getElementById('btn-busca-toggle').addEventListener('click', (e)=>{
   el.classList.toggle('open', willOpen);
   if(willOpen) document.getElementById('f-busca').focus();
 });
-// Fecha os três flyouts (admin, csv, busca) ao clicar fora deles
+// Fecha os quatro flyouts (admin, csv, busca e status por Colab) ao clicar fora deles
 document.addEventListener('click', (e)=>{
   const dropdown = document.getElementById('admin-dropdown');
   const btn = document.getElementById('btn-admin-menu');
@@ -718,6 +727,11 @@ document.addEventListener('click', (e)=>{
   const csvBtn = document.getElementById('btn-csv-menu');
   if(csvDropdown.classList.contains('open') && !csvDropdown.contains(e.target) && e.target !== csvBtn){
     csvDropdown.classList.remove('open');
+  }
+  const bulkColabFlyout = document.getElementById('bulk-colab-flyout');
+  const bulkColabBtn = document.getElementById('btn-bulk-colab-menu');
+  if(bulkColabFlyout.classList.contains('open') && !bulkColabFlyout.contains(e.target) && e.target !== bulkColabBtn){
+    bulkColabFlyout.classList.remove('open');
   }
   const buscaFlyout = document.getElementById('busca-flyout');
   const buscaBtn = document.getElementById('btn-busca-toggle');
@@ -3312,7 +3326,7 @@ function atualizarSaudacao(){
 function applyRolePermissions(){
   atualizarSaudacao();
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
-  document.getElementById('bulk-colab-panel').style.display = canEdit() ? '' : 'none';
+  document.getElementById('bulk-colab-menu-wrap').style.display = canEdit() ? '' : 'none';
   document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';

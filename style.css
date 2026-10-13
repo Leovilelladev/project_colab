@@ -216,6 +216,15 @@
   }
   .rail-flyout.open{opacity:1; visibility:visible; pointer-events:auto; transform:translateX(0);}
   .rail-flyout input{width:100%;}
+  .app-sidebar .bulk-colab-flyout{width:250px;}
+  .bulk-colab-flyout strong{font-size:13px;}
+  .bulk-colab-flyout > span{color:var(--ink-soft); font-size:11px; line-height:1.35;}
+  .bulk-colab-flyout label{font-size:11px; color:var(--ink-soft); margin-top:2px;}
+  .bulk-colab-flyout textarea, .bulk-colab-flyout select{width:100%; box-sizing:border-box; font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); color:var(--ink);}
+  .bulk-colab-flyout textarea{resize:vertical; min-height:58px;}
+  .bulk-colab-flyout textarea:focus, .bulk-colab-flyout select:focus{outline:none; border-color:var(--blue);}
+  .bulk-colab-flyout button{width:100%;}
+  .bulk-colab-flyout .status-msg{margin-top:1px;}
   /* .admin-dropdown por padrão se posiciona abaixo-à-direita de um botão largo; aqui, dentro do
      rail estreito, precisa virar flyout à direita do ícone — specificidade maior garante que vença */
   .app-sidebar .admin-dropdown{
@@ -433,21 +442,6 @@
 
   .pagination{display:flex; justify-content:center; align-items:center; gap:12px; padding:12px; font-size:13px;}
 
-  /* formulário de alteração de status por números de Colab */
-  .bulk-colab-panel{
-    background:var(--paper-2); border:1px solid var(--line); border-radius:var(--radius);
-    padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 3px rgba(22,35,58,0.05);
-  }
-  .bulk-colab-heading{display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;}
-  .bulk-colab-heading strong{display:block; font-size:13px;}
-  .bulk-colab-heading span{display:block; color:var(--ink-soft); font-size:12px; margin-top:2px;}
-  .bulk-colab-controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .bulk-colab-controls textarea{min-width:240px; flex:1; min-height:38px; resize:vertical;}
-  .bulk-colab-controls select{min-width:190px;}
-  .bulk-colab-controls textarea, .bulk-colab-controls select{font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); color:var(--ink);}
-  .bulk-colab-controls textarea:focus, .bulk-colab-controls select:focus{outline:none; border-color:var(--blue);}
-  #bulk-colab-msg{margin-top:7px;}
-
   /* barra flutuante de ações em massa (aparece quando linhas da tabela estão selecionadas) */
   .bulk-bar{
     display:none; align-items:center; gap:10px; flex-wrap:wrap;
@@ -646,8 +640,6 @@
     .modal{max-width:92vw !important;}
     .bulk-bar{flex-direction:column; align-items:stretch;}
     .bulk-bar select, .bulk-bar button{width:100%;}
-    .bulk-colab-controls{align-items:stretch; flex-direction:column;}
-    .bulk-colab-controls textarea, .bulk-colab-controls select, .bulk-colab-controls button{width:100%; box-sizing:border-box;}
     .date-popover{width:92vw; left:50%; transform:translateX(-50%);}
 
     /* cabeçalho: caixa do usuário pode quebrar linha em telas bem pequenas */
@@ -780,7 +772,7 @@
   }
   body.theme-admin .filters-panel, body.theme-admin .table-card,
   body.theme-admin .chart-card, body.theme-admin .stat, body.theme-admin .modal,
-  body.theme-admin .date-popover, body.theme-admin .admin-dropdown{
+  body.theme-admin .date-popover, body.theme-admin .admin-dropdown, body.theme-admin .bulk-colab-flyout{
     background:var(--paper-2); border-color:var(--line);
   }
   body.theme-admin .toolbar{

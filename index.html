@@ -212,6 +212,26 @@
         </div>
       </div>
 
+      <div class="rail-section" id="bulk-colab-menu-wrap" style="display:none;">
+        <button type="button" class="rail-btn" id="btn-bulk-colab-menu" data-label="Alterar status" aria-label="Alterar status por Colab">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3"/><path d="M17 17H7l3 3"/><path d="M17 7a6 6 0 0 1 2.2 4.6"/><path d="M7 17a6 6 0 0 1-2.2-4.6"/></svg>
+        </button>
+        <div class="rail-flyout bulk-colab-flyout" id="bulk-colab-flyout">
+          <strong>Alterar status por Colab</strong>
+          <span>Separe os números por vírgula, espaço, ponto e vírgula ou linha.</span>
+          <label for="bulk-colab-input">Números dos Colabs</label>
+          <textarea id="bulk-colab-input" rows="3" placeholder="Ex.: 1001, 1002, 1003" aria-label="Números dos Colabs"></textarea>
+          <select id="bulk-colab-status" aria-label="Novo status da vistoria">
+            <option value="">Novo status…</option>
+            <option value="pendente">Pendente</option>
+            <option value="agendada">Agendada</option>
+            <option value="realizada">Realizada</option>
+          </select>
+          <button class="secondary" id="btn-bulk-colab-apply">Alterar status</button>
+          <div class="status-msg" id="bulk-colab-msg" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+
       <button type="button" class="rail-btn" id="btn-mapa" data-label="Ver mapa" aria-label="Ver mapa">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6.5-9 12-9 12s-9-5.5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </button>
@@ -282,27 +302,6 @@
   </div>
 
   <div class="status-msg" id="import-status"></div>
-
-  <!-- Alteração rápida de status por uma lista de números de Colab, sem precisar marcar as linhas na tabela -->
-  <section class="bulk-colab-panel" id="bulk-colab-panel" style="display:none;">
-    <div class="bulk-colab-heading">
-      <div>
-        <strong>Alterar status por Colab</strong>
-        <span>Informe vários números separados por vírgula, espaço, ponto e vírgula ou um por linha.</span>
-      </div>
-    </div>
-    <div class="bulk-colab-controls">
-      <textarea id="bulk-colab-input" rows="2" placeholder="Ex.: 1001, 1002, 1003" aria-label="Números dos Colabs"></textarea>
-      <select id="bulk-colab-status" aria-label="Novo status da vistoria">
-        <option value="">Alterar vistoria para…</option>
-        <option value="pendente">Pendente</option>
-        <option value="agendada">Agendada</option>
-        <option value="realizada">Realizada</option>
-      </select>
-      <button class="secondary" id="btn-bulk-colab-apply">Alterar status</button>
-    </div>
-    <div class="status-msg" id="bulk-colab-msg" role="status" aria-live="polite"></div>
-  </section>
 
   <!-- Barra flutuante de ações em massa, some quando nenhuma linha da tabela está selecionada -->
   <div class="bulk-bar" id="bulk-bar">

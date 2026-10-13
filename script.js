@@ -1,28 +1,34 @@
+// Estado global de autenticação: papel (role) do usuário logado, seus dados e o token de acesso do Supabase
 let currentRole = null;
 let currentUser = null;
 let accessToken = null;
 
+// Checagens de permissão usadas por toda a UI para mostrar/esconder botões de editar/administrar
 function canEdit(){ return currentRole === 'supervisor' || currentRole === 'admin'; }
 function isAdmin(){ return currentRole === 'admin'; }
 function roleLabel(){
   return cargoLabel(currentRole);
 }
 
+// Credenciais e endpoint do projeto Supabase (banco de dados/backend) usado pelo app
 const SUPABASE_URL = 'https://amnnvhbwdfaeubdvtloz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtbm52aGJ3ZGZhZXViZHZ0bG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTI3NjUsImV4cCI6MjEwMDM4ODc2NX0.j771rG4z6mMmVY9XlW0-psbIV3skqGlLSOde9S7B2ow';
-const TABLE = 'registros';
+const TABLE = 'registros'; // nome da tabela principal no banco
 
-const NITEROI_BAIRROS = ['Atalaia','Badu','Baldeador','Barreto','Boa Viagem','Camboinhas','Cantagalo','Caramujo','Centro','Charitas','Cubango','Engenho do Mato','Engenhoca','Fátima','Figueira','Fonseca','Gragoatá','Icaraí','Ilha da Conceição','Ingá','Itacoatiara','Itaipu','Ititioca','Jacaré','Jardim Imbuí','Jurujuba','Largo da Batalha','Largo do Barradas','Maceió','Maravista','Marazul','Maria Paula','Mata Paca','Muriqui','Pé Pequeno','Pendotiba','Piratininga',"Ponta D'Areia",'Rio do Ouro','Santa Bárbara','Santa Rosa','Santana','Santo Antônio','São Domingos','São Francisco','São Lourenço','Sapê','Serra Grande','Tenente Jardim','Várzea das Moças','Venda da Cruz','Vila Progresso','Vital Brazil'];
+// Lista fixa dos bairros de Niterói, usada para validar e sugerir valores nos campos "bairro"
+const NITEROI_BAIRROS =['Atalaia','Badu','Baldeador','Barreto','Boa Viagem','Camboinhas','Cantagalo','Caramujo','Centro','Charitas','Cubango','Engenho do Mato','Engenhoca','Fátima','Figueira','Fonseca','Gragoatá','Icaraí','Ilha da Conceição','Ingá','Itacoatiara','Itaipu','Ititioca','Jacaré','Jardim Imbuí','Jurujuba','Largo da Batalha','Largo do Barradas','Maceió','Maravista','Marazul','Maria Paula','Mata Paca','Muriqui','Pé Pequeno','Pendotiba','Piratininga',"Ponta D'Areia",'Rio do Ouro','Santa Bárbara','Santa Rosa','Santana','Santo Antônio','São Domingos','São Francisco','São Lourenço','Sapê','Serra Grande','Tenente Jardim','Várzea das Moças','Venda da Cruz','Vila Progresso','Vital Brazil'];
 
 function popularBairros(){
   /* lista fixa já vive em NITEROI_BAIRROS; os dropdowns são montados sob demanda pelas caixas de sugestão */
 }
 
+// Retorna o nome "oficial" do bairro (com acentuação correta) se o valor digitado bater com algum da lista
 function bairroValido(valor){
   const alvo = String(valor||'').trim().toLowerCase();
   return NITEROI_BAIRROS.find(b => b.toLowerCase() === alvo) || null;
 }
 
+// Monta e exibe o popover de autocomplete de bairros, filtrando a lista conforme o texto digitado
 function mostrarSugestoesBairro(inputId, popoverId, listaCompleta){
   const input = document.getElementById(inputId);
   const pop = document.getElementById(popoverId);
@@ -35,6 +41,7 @@ function mostrarSugestoesBairro(inputId, popoverId, listaCompleta){
   pop.classList.add('open');
 }
 
+// Monta os headers padrão exigidos pela API REST do Supabase (chave da API + token do usuário logado)
 function supaHeaders(extra){
   return Object.assign({
     'apikey': SUPABASE_ANON_KEY,
@@ -43,6 +50,8 @@ function supaHeaders(extra){
   }, extra || {});
 }
 
+// Wrapper em volta do fetch nativo: se a gravação falhar por falta de rede, guarda para reenviar depois;
+// se a API responder 401 (sessão expirada), força o logout automático
 async function supaFetch(url, options){
   const isWrite = !!(options && options.method && options.method !== 'GET');
   let res;
@@ -59,13 +68,16 @@ async function supaFetch(url, options){
   return res;
 }
 
+// Fila (em memória) de requisições que falharam por falta de conexão e precisam ser reenviadas
 let alteracoesPendentes = [];
 
+// Guarda uma requisição que falhou na fila de pendentes e atualiza o indicador visual
 function registrarAlteracaoPendente(url, options){
   alteracoesPendentes.push({ url: url, options: options });
   atualizarBadgePendente();
 }
 
+// Mostra/esconde o badge "X alterações pendentes de envio" no topo da tela
 function atualizarBadgePendente(){
   const badge = document.getElementById('sync-pendente-badge');
   if(!badge) return;
@@ -79,6 +91,7 @@ function atualizarBadgePendente(){
   }
 }
 
+// Ao voltar a ficar online, tenta reenviar cada requisição pendente; as que falharem de novo voltam pra fila
 async function tentarReenviarPendentes(){
   if(alteracoesPendentes.length === 0) return;
   const badge = document.getElementById('sync-pendente-badge');
@@ -100,8 +113,10 @@ async function tentarReenviarPendentes(){
   if(falharam === 0 && fila.length > 0) loadRecords(true);
 }
 
+// O navegador dispara 'online' quando a conexão volta; aproveitamos pra tentar sincronizar
 window.addEventListener('online', tentarReenviarPendentes);
 
+// Limpa os dados de login e reabre a tela de login (chamado quando a API retorna 401)
 function handleSessionExpired(){
   currentRole = null;
   currentUser = null;
@@ -111,6 +126,8 @@ function handleSessionExpired(){
   document.getElementById('login-error').textContent = 'Sua sessão expirou. Faça login novamente.';
 }
 
+// Estado global da tabela/UI: registros carregados, timer de refresh, item em edição,
+// ordenação/paginação atuais, seleção de linhas e instâncias dos gráficos (Chart.js)
 let records = [];
 let refreshTimer = null;
 let editingId = null;
@@ -123,8 +140,10 @@ let chartBairro, chartStatus, chartColab, chartTipoServico;
 let graficoDadosCache = {};
 let chartZoom = null;
 
+// Gera um ID único simples (timestamp + aleatório) para novos registros criados no cliente
 function uid(){ return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+// Busca todos os registros da tabela no Supabase e redesenha a tela (tabela, cards e gráficos)
 async function loadRecords(silent){
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=*&order=criado_em.desc', {
@@ -147,6 +166,7 @@ async function loadRecords(silent){
   render();
 }
 
+// Converte um endereço em latitude/longitude usando a API pública Nominatim (OpenStreetMap), para exibir no mapa
 async function geocodeEndereco(endereco, bairro){
   try{
     const query = encodeURIComponent(endereco + ', ' + bairro + ', Niterói, RJ, Brasil');
@@ -160,6 +180,7 @@ async function geocodeEndereco(endereco, bairro){
   }
 }
 
+// Geocodifica o endereço e envia (POST) um novo registro para o Supabase
 async function insertRecordAPI(rec){
   const geo = await geocodeEndereco(rec.endereco, rec.bairro);
   const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE, {
@@ -175,6 +196,7 @@ async function insertRecordAPI(rec){
   if(!res.ok) throw new Error('Falha ao salvar (' + res.status + ')');
 }
 
+// Regeocodifica o endereço e atualiza (PATCH) um registro existente pelo id, gravando quem/quando editou
 async function updateRecordAPI(id, rec){
   const geo = await geocodeEndereco(rec.endereco, rec.bairro);
   const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?id=eq.' + encodeURIComponent(id), {
@@ -191,6 +213,22 @@ async function updateRecordAPI(id, rec){
   if(!res.ok) throw new Error('Falha ao atualizar (' + res.status + ')');
 }
 
+// Atualiza somente o status da vistoria, usado pela alteração em massa por números de Colab
+// para evitar geocodificar novamente os endereços dos registros.
+async function updateStatusAPI(id, status){
+  const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: supaHeaders({'Prefer':'return=minimal'}),
+    body: JSON.stringify({
+      vistoria: status,
+      atualizado_por: currentUser ? currentUser.email : null,
+      atualizado_em: new Date().toISOString()
+    })
+  });
+  if(!res.ok) throw new Error('Falha ao atualizar status (' + res.status + ')');
+}
+
+// Exclui (DELETE) um registro pelo id
 async function deleteRecordAPI(id){
   const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?id=eq.' + encodeURIComponent(id), {
     method: 'DELETE',
@@ -199,6 +237,7 @@ async function deleteRecordAPI(id){
   if(!res.ok) throw new Error('Falha ao excluir (' + res.status + ')');
 }
 
+// Guarda uma cópia do registro excluído na tabela "registros_excluidos" (histórico/auditoria de exclusões)
 async function logDeletion(r){
   await supaFetch(SUPABASE_URL + '/rest/v1/registros_excluidos', {
     method: 'POST',
@@ -212,35 +251,42 @@ async function logDeletion(r){
   });
 }
 
+// Retorna os valores distintos e não vazios de uma coluna dos registros, ordenados alfabeticamente (pt-BR)
 function uniqueValues(key){
   return [...new Set(records.map(r => r[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
 }
 
+// Preenche as <datalist> de autocomplete dos filtros de "colaborador" e "responsável" com valores já usados
 function populateFilterOptions(){
   document.getElementById('list-colab').innerHTML = uniqueValues('colab').map(v=>`<option value="${escAttr(v)}">`).join('');
   document.getElementById('list-responsavel').innerHTML = uniqueValues('responsavel').map(v=>`<option value="${escAttr(v)}">`).join('');
 }
 
+// Escapa caracteres especiais de HTML para evitar quebra de layout ou XSS ao inserir texto dinâmico na página
 function escHtml(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function escAttr(s){ return escHtml(s); }
 
 /* ===== Avatares gerados (iniciais + cor determinística) ===== */
+// Extrai as iniciais do nome (primeira + última palavra) para usar no avatar quando não há foto
 function avatarIniciais(nome){
   const partes = String(nome ?? '').trim().split(/\s+/).filter(Boolean);
   if(partes.length === 0) return '?';
   if(partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
+// Gera um matiz de cor (0-360) determinístico a partir do texto (hash simples), pra cada pessoa ter sempre a mesma cor de avatar
 function avatarMatiz(str){
   let hash = 0;
   const s = String(str ?? '?');
   for(let i = 0; i < s.length; i++){ hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
   return Math.abs(hash) % 360;
 }
+// Traduz o "role" salvo no banco (admin/supervisor/operador) para o rótulo exibido na tela
 function cargoLabel(role){
   return {admin:'Administrador', supervisor:'Supervisor', operador:'Operador'}[role] || role || '';
 }
 
+// Monta o HTML de um avatar: usa a foto se houver, senão um círculo colorido com as iniciais
 function avatarHtml(nome, tamanho, urlFoto, email, cargo){
   const cls = 'avatar-3d avatar-3d-' + (tamanho || 'sm');
   if(urlFoto){
@@ -253,6 +299,7 @@ function avatarHtml(nome, tamanho, urlFoto, email, cargo){
   return '<span class="' + cls + '" style="--avatar-hue:' + hue + '" title="' + escAttr(nome || '') + '">' + escHtml(iniciais) + '</span>';
 }
 
+// Abre o modal de "zoom" do avatar clicado, mostrando nome, cargo e quantos registros a pessoa cadastrou
 function abrirZoomAvatar(url, nome, cargo, email){
   if(!url) return;
   document.getElementById('avatar-zoom-img').src = url;
@@ -266,6 +313,7 @@ function fecharZoomAvatar(){
   document.getElementById('avatar-zoom-overlay').classList.remove('open');
 }
 
+// Gera a linha "vazia" da tabela (com ilustração no tema admin) exibida quando não há registros a mostrar
 function emptyStateRow(colspan, message){
   if(!document.body.classList.contains('theme-admin')){
     return '<tr class="empty-row"><td colspan="' + colspan + '">' + message + '</td></tr>';
@@ -280,6 +328,8 @@ function emptyStateRow(colspan, message){
     '</svg>' + message + '</td></tr>';
 }
 
+// Aplica todos os filtros ativos (colaborador, responsável, bairro, status, tipo de serviço, período,
+// busca livre e "só paradas") sobre `records` e devolve a lista já ordenada conforme sortKey/sortDir
 function getFiltered(){
   const colab = document.getElementById('f-colab').value.trim().toLowerCase();
   const responsavel = document.getElementById('f-responsavel').value.trim().toLowerCase();
@@ -321,6 +371,7 @@ function getFiltered(){
   return list;
 }
 
+// Função "mestre" de redesenho: chamada sempre que os dados ou filtros mudam para atualizar toda a UI
 function render(){
   populateFilterOptions();
   renderStats();
@@ -328,8 +379,10 @@ function render(){
   renderCharts();
 }
 
+// Guarda os últimos valores dos cards de estatística, usados para animar a transição para os novos números
 let lastStats = {total:0, pendente:0, agendada:0, realizada:0};
 
+// Anima a troca de um número na tela (contagem crescente/decrescente) usando requestAnimationFrame
 function animateNumber(el, to, from){
   if(!el || from === to){ if(el) el.textContent = to; return; }
   const duration = 400;
@@ -344,6 +397,7 @@ function animateNumber(el, to, from){
   requestAnimationFrame(step);
 }
 
+// Recalcula os cards de estatísticas (Total/Pendentes/Agendadas/Realizadas) e anima os números
 function renderStats(){
   const total = records.length;
   const pendente = records.filter(r=>r.vistoria==='pendente').length;
@@ -364,6 +418,7 @@ function renderStats(){
   lastStats = {total, pendente, agendada, realizada};
 }
 
+// Ao clicar num card de estatística, aplica o filtro de status correspondente e reabre o painel de filtros
 function filtrarPorStatusCard(status){
   document.getElementById('f-status').value = status;
   document.getElementById('filters-panel').classList.add('open');
@@ -371,6 +426,7 @@ function filtrarPorStatusCard(status){
   render();
 }
 
+// Renderiza a tabela principal: pega os registros filtrados, corta pela página atual e monta as linhas <tr>
 function renderTable(){
   const filtered = getFiltered();
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -418,6 +474,7 @@ function renderTable(){
   `;
 }
 
+// Traduz o status salvo no banco para o rótulo exibido na tela
 function statusLabel(s){
   return {pendente:'Pendente', agendada:'Agendada', realizada:'Realizada'}[s] || s || '—';
 }
@@ -425,6 +482,7 @@ function statusLabel(s){
 /* Prazo esperado (em dias) pra cada status sair do lugar antes de virar "atrasado" na tabela. */
 const SLA_DIAS = { pendente: 5, agendada: 30 };
 
+// Calcula se um registro está "atrasado" (passou do prazo de SLA_DIAS parado no mesmo status) e por quantos dias
 function calcularAtrasoSLA(r){
   const limite = SLA_DIAS[r.vistoria];
   if(!limite || !r.data) return null;
@@ -432,21 +490,25 @@ function calcularAtrasoSLA(r){
   if(dias <= limite) return null;
   return { dias, limite };
 }
+// Traduz o tipo de serviço salvo no banco para o rótulo exibido na tela
 function tipoServicoLabel(s){
   return {pavimentacao:'Pavimentação', obra_civil:'Obra Civil'}[s] || s || '—';
 }
+// Monta o texto de tooltip (title) de uma linha da tabela, informando quem criou/editou o registro
 function rowAuditTitle(r){
   let parts = [];
   if(r.criadoPor) parts.push('Cadastrado por ' + r.criadoPor);
   if(r.atualizadoPor) parts.push('Editado por ' + r.atualizadoPor + (r.atualizadoEm ? ' em ' + formatDate(r.atualizadoEm.slice(0,10)) : ''));
   return parts.join(' · ') || 'Sem informação de autoria';
 }
+// Converte data ISO (yyyy-mm-dd, formato do banco) para o formato brasileiro dd/mm/yyyy exibido na tela
 function formatDate(d){
   if(!d) return '—';
   const [y,m,day] = d.split('-');
   return `${day}/${m}/${y}`;
 }
 
+// Converte data no formato brasileiro (dd/mm/yyyy, digitada pelo usuário) de volta para ISO (yyyy-mm-dd)
 function brDateToIso(br){
   const m = String(br||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(!m) return null;
@@ -455,8 +517,10 @@ function brDateToIso(br){
   return yyyy + '-' + mm + '-' + dd;
 }
 
-let fdViewDate = new Date();
+/* ===== Calendário do campo "Data" do formulário de novo/editar registro ===== */
+let fdViewDate = new Date(); // mês/ano atualmente exibido no mini-calendário do formulário
 
+// Desenha o mini-calendário (grade de dias) do campo de data do formulário, destacando o dia selecionado
 function fdRenderCalendar(){
   const y = fdViewDate.getFullYear();
   const m = fdViewDate.getMonth();
@@ -488,24 +552,28 @@ function fdRenderCalendar(){
   `;
 }
 
+// Navega o mini-calendário do formulário para o mês anterior/seguinte
 function fdChangeMonth(delta){
   fdViewDate.setMonth(fdViewDate.getMonth() + delta);
   fdRenderCalendar();
 }
 
+// Seleciona uma data no mini-calendário do formulário e fecha o popover
 function fdPickDate(iso){
   document.getElementById('in-data').value = formatDate(iso);
   document.getElementById('form-date-popover').classList.remove('open');
 }
 
+/* ===== Calendário de intervalo de datas (filtro "Período") ===== */
 const DP_MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-let dpViewDate = new Date();
-let dpStart = null;
-let dpEnd = null;
+let dpViewDate = new Date(); // mês/ano exibido no calendário de filtro
+let dpStart = null; // data inicial do intervalo selecionado (ISO)
+let dpEnd = null;   // data final do intervalo selecionado (ISO)
 
 function dpPad2(n){ return String(n).padStart(2,'0'); }
 function dpToISO(y,m,d){ return y + '-' + dpPad2(m+1) + '-' + dpPad2(d); }
 
+// Desenha o calendário do filtro de período, destacando o intervalo (dpStart..dpEnd) já escolhido
 function renderCalendar(){
   const y = dpViewDate.getFullYear();
   const m = dpViewDate.getMonth();
@@ -538,11 +606,13 @@ function renderCalendar(){
   `;
 }
 
+// Navega o calendário de filtro para o mês anterior/seguinte
 function dpChangeMonth(delta){
   dpViewDate.setMonth(dpViewDate.getMonth() + delta);
   renderCalendar();
 }
 
+// Lógica de seleção de intervalo: primeiro clique define o início, o segundo define o fim (ou reinicia se a data for anterior ao início)
 function dpPickDate(iso){
   if(!dpStart || (dpStart && dpEnd)){
     dpStart = iso; dpEnd = null;
@@ -554,6 +624,7 @@ function dpPickDate(iso){
   renderCalendar();
 }
 
+// Atualiza o texto do botão de filtro de período com o intervalo escolhido
 function dpUpdateButtonLabel(){
   const btn = document.getElementById('btn-daterange');
   if(dpStart && dpEnd) btn.textContent = formatDate(dpStart) + ' → ' + formatDate(dpEnd);
@@ -561,6 +632,7 @@ function dpUpdateButtonLabel(){
   else btn.textContent = 'Período: todos';
 }
 
+// Limpa o filtro de período e re-renderiza a lista sem restrição de data
 function dpClear(){
   dpStart = null; dpEnd = null;
   dpUpdateButtonLabel();
@@ -568,12 +640,14 @@ function dpClear(){
   page = 1; render();
 }
 
+// Confirma o intervalo escolhido, fecha o popover e aplica o filtro
 function dpApply(){
   dpUpdateButtonLabel();
   document.getElementById('date-popover').classList.remove('open');
   page = 1; render();
 }
 
+// Abre/fecha o popover do calendário de período ao clicar no botão
 document.getElementById('btn-daterange').addEventListener('click', (e)=>{
   e.stopPropagation();
   const pop = document.getElementById('date-popover');
@@ -581,6 +655,7 @@ document.getElementById('btn-daterange').addEventListener('click', (e)=>{
   pop.classList.toggle('open', willOpen);
   if(willOpen) renderCalendar();
 });
+// Fecha o popover de período ao clicar fora dele
 document.addEventListener('click', (e)=>{
   const pop = document.getElementById('date-popover');
   const btn = document.getElementById('btn-daterange');
@@ -589,10 +664,12 @@ document.addEventListener('click', (e)=>{
   }
 });
 
+// Botão que expande/recolhe o painel de filtros avançados
 document.getElementById('btn-toggle-filtros').addEventListener('click', ()=>{
   document.getElementById('filters-panel').classList.toggle('open');
 });
 
+// Botão que alterna o modo "compacto" (linhas mais densas) da tabela
 document.getElementById('btn-densidade').addEventListener('click', ()=>{
   document.body.classList.toggle('compact-mode');
 });
@@ -605,6 +682,7 @@ function fecharFlyoutsRail(exceto){
     if(el) el.classList.remove('open');
   });
 }
+// Abre/fecha o menu dropdown "Admin" da barra lateral, fechando os outros flyouts antes
 document.getElementById('btn-admin-menu').addEventListener('click', (e)=>{
   e.stopPropagation();
   const el = document.getElementById('admin-dropdown');
@@ -612,6 +690,7 @@ document.getElementById('btn-admin-menu').addEventListener('click', (e)=>{
   fecharFlyoutsRail(willOpen ? 'admin-dropdown' : null);
   el.classList.toggle('open', willOpen);
 });
+// Abre/fecha o menu dropdown de exportação CSV
 document.getElementById('btn-csv-menu').addEventListener('click', (e)=>{
   e.stopPropagation();
   const el = document.getElementById('csv-dropdown');
@@ -619,6 +698,7 @@ document.getElementById('btn-csv-menu').addEventListener('click', (e)=>{
   fecharFlyoutsRail(willOpen ? 'csv-dropdown' : null);
   el.classList.toggle('open', willOpen);
 });
+// Abre/fecha o flyout de busca rápida e foca o campo de texto ao abrir
 document.getElementById('btn-busca-toggle').addEventListener('click', (e)=>{
   e.stopPropagation();
   const el = document.getElementById('busca-flyout');
@@ -627,6 +707,7 @@ document.getElementById('btn-busca-toggle').addEventListener('click', (e)=>{
   el.classList.toggle('open', willOpen);
   if(willOpen) document.getElementById('f-busca').focus();
 });
+// Fecha os três flyouts (admin, csv, busca) ao clicar fora deles
 document.addEventListener('click', (e)=>{
   const dropdown = document.getElementById('admin-dropdown');
   const btn = document.getElementById('btn-admin-menu');
@@ -650,17 +731,19 @@ function abrirSidebar(){
   document.getElementById('app-sidebar').classList.add('open');
   document.getElementById('sidebar-backdrop').classList.add('open');
 }
+// Fecha a sidebar, o fundo escurecido (backdrop) e qualquer flyout que estivesse aberto dentro dela
 function fecharSidebar(){
   document.getElementById('app-sidebar').classList.remove('open');
   document.getElementById('sidebar-backdrop').classList.remove('open');
   fecharFlyoutsRail(null);
 }
+// Botão hambúrguer: abre a sidebar se estiver fechada, fecha se estiver aberta
 document.getElementById('btn-toggle-sidebar').addEventListener('click', ()=>{
   document.getElementById('app-sidebar').classList.contains('open') ? fecharSidebar() : abrirSidebar();
 });
 document.getElementById('btn-close-sidebar').addEventListener('click', fecharSidebar);
-document.getElementById('sidebar-backdrop').addEventListener('click', fecharSidebar);
-document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar(); });
+document.getElementById('sidebar-backdrop').addEventListener('click', fecharSidebar); // clicar fora fecha
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar(); }); // tecla Esc fecha
 /* ao escolher uma ação (abrir mapa, chamados, exportar csv...) a sidebar fecha sozinha */
 ['btn-mapa','btn-chamados','btn-anotacoes','btn-relatorio-mensal','btn-export','btn-import',
  'btn-atividade','btn-historico','btn-backup','btn-restore','btn-geocodificar','btn-abrir-aviso','btn-toggle-filtros'
@@ -669,8 +752,10 @@ document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar
   if(el) el.addEventListener('click', fecharSidebar);
 });
 
+// Avança/retrocede a paginação da tabela (delta = +1 ou -1) e redesenha só a tabela
 function changePage(delta){ page += delta; renderTable(); }
 
+// Recalcula os totais por bairro, status, responsável e tipo de serviço e (re)desenha os 4 gráficos (Chart.js)
 function renderCharts(){
   const filtered = getFiltered();
 
@@ -727,6 +812,7 @@ function renderCharts(){
   });
 }
 
+// Abre o modal de gráfico "ampliado", redesenhando o mesmo gráfico em tamanho maior usando os dados em cache
 function ampliarGrafico(tipo){
   const titulos = { bairro:'Por bairro', status:'Status da vistoria', responsavel:'Por responsável', tiposervico:'Tipo de serviço' };
   document.getElementById('chart-zoom-titulo').textContent = titulos[tipo];
@@ -770,16 +856,19 @@ function fecharChartZoom(){
   document.getElementById('chart-zoom-overlay').classList.remove('open');
 }
 
-// modal
+/* ===== Modal de novo/editar registro ===== */
+// Abre o modal com o título dado e limpa mensagens de erro anteriores
 function openModal(title){
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-msg').textContent = '';
   document.getElementById('overlay').classList.add('open');
 }
+// Fecha o modal e limpa o id em edição
 function closeModal(){
   document.getElementById('overlay').classList.remove('open');
   editingId = null;
 }
+// Prepara o modal para cadastro de um registro novo: limpa os campos e define valores padrão (data de hoje, status "pendente")
 function openNew(){
   editingId = null;
   document.getElementById('in-colab').value = '';
@@ -792,6 +881,7 @@ function openNew(){
   document.getElementById('in-bairro').value = '';
   openModal('Novo registro');
 }
+// Prepara o modal para editar um registro existente: preenche os campos com os dados atuais dele
 function openEdit(id){
   if(!canEdit()) return;
   const r = records.find(x=>x.id === id);
@@ -807,6 +897,7 @@ function openEdit(id){
   document.getElementById('in-bairro').value = r.bairro || '';
   openModal('Editar registro');
 }
+// Confirma com o usuário, registra o log de exclusão e apaga o registro (recarregando a lista em seguida)
 async function deleteRecord(id){
   if(!canEdit()) return;
   if(!confirm('Excluir este registro?')) return;
@@ -819,6 +910,8 @@ async function deleteRecord(id){
     alert('Não foi possível excluir. Tente novamente.');
   }
 }
+// Lê os campos do formulário, valida (obrigatórios, data, bairro, colab duplicado) e então
+// cria ou atualiza o registro via API, fechando o modal e recarregando a lista em caso de sucesso
 async function saveForm(){
   if(editingId && !canEdit()) return;
   const colab = document.getElementById('in-colab').value.trim();
@@ -874,6 +967,7 @@ async function saveForm(){
   }
 }
 
+// Exporta os registros filtrados atualmente na tela para um arquivo CSV e dispara o download
 function exportCSV(){
   const filtered = getFiltered();
   const header = ['Colab','Responsável','Tipo de Serviço','Abertura de Processo','Vistoria','Data','Endereço','Bairro','Cadastrado por','Editado por','Editado em'];
@@ -889,6 +983,7 @@ function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
+// Exporta os registros marcados (checkbox) como uma planilha Excel (.xlsx) formatada, pronta para a equipe de vistoria preencher
 function exportarParaVistoria(){
   if(selectedIds.size === 0) return;
   const selecionados = records.filter(r => selectedIds.has(r.id));
@@ -930,10 +1025,14 @@ function exportarParaVistoria(){
   XLSX.writeFile(wb, `vistoria_${hoje}.xlsx`);
 }
 
+/* ===== Verificação de "Colab" duplicado (cada colaborador só pode aparecer uma vez na base) ===== */
+// Normaliza o valor do colab (trim + minúsculas) para comparação sem diferenciar caixa/espaços
 function normalizeColab(v){
   return String(v || '').trim().toLowerCase();
 }
 
+// Consulta a API se já existe outro registro com o mesmo colab (ignorando o próprio, se estiver editando);
+// se a API falhar, cai para checar na lista `records` já carregada em memória
 async function colabExists(colab, excludeId){
   const key = normalizeColab(colab);
   if(!key) return false;
@@ -949,6 +1048,7 @@ async function colabExists(colab, excludeId){
   }
 }
 
+// Busca o conjunto de todos os colabs já cadastrados (usado para contar "novos vs. já existentes" na importação)
 async function fetchExistingColabSet(){
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=colab', { headers: supaHeaders() });
@@ -960,6 +1060,8 @@ async function fetchExistingColabSet(){
   }
 }
 
+// Busca um mapa colab -> {id, status atual} de todos os registros, usado na importação em modo "atualização"
+// para saber o id de cada registro existente e se o status de vistoria realmente mudou
 async function fetchColabIdMap(){
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/' + TABLE + '?select=id,colab,vistoria', { headers: supaHeaders() });
@@ -975,10 +1077,13 @@ async function fetchColabIdMap(){
   }
 }
 
+/* ===== Importa\u00e7\u00e3o de CSV: reconhecimento de colunas e normaliza\u00e7\u00e3o de valores ===== */
+// Remove acentos, deixa min\u00fasculo e tira tudo que n\u00e3o for letra/n\u00famero \u2014 usado para comparar nomes de coluna e valores de forma tolerante
 function normalizeKey(s){
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
+// Poss\u00edveis nomes (varia\u00e7\u00f5es) que uma coluna do CSV pode ter para cada campo do sistema
 const HEADER_ALIASES = {
   colab: ['colab','colaborador'],
   responsavel: ['responsavel'],
@@ -990,6 +1095,7 @@ const HEADER_ALIASES = {
   bairro: ['bairro']
 };
 
+// Descobre a qual campo do sistema um cabeçalho de coluna do CSV corresponde, usando HEADER_ALIASES
 function matchField(headerKey){
   for(const field in HEADER_ALIASES){
     if(HEADER_ALIASES[field].includes(headerKey)) return field;
@@ -997,12 +1103,14 @@ function matchField(headerKey){
   return null;
 }
 
+// Interpreta o valor de "tipo de serviço" do CSV e converte para os valores internos aceitos
 function normalizeTipoServico(v){
   const k = normalizeKey(v);
   if(k.startsWith('obra') || k.startsWith('civil')) return 'obra_civil';
   return 'pavimentacao';
 }
 
+// Interpreta o valor de "vistoria/status" do CSV e converte para os valores internos aceitos
 function normalizeVistoria(v){
   const k = normalizeKey(v);
   if(k.startsWith('agend')) return 'agendada';
@@ -1010,6 +1118,7 @@ function normalizeVistoria(v){
   return 'pendente';
 }
 
+// Aceita datas já em ISO (yyyy-mm-dd) ou no formato brasileiro (dd/mm/yyyy) e devolve sempre em ISO
 function normalizeDate(v){
   if(!v) return null;
   const s = String(v).trim();
@@ -1019,8 +1128,10 @@ function normalizeDate(v){
   return null;
 }
 
-let pendingImport = null;
+let pendingImport = null; // guarda os registros já interpretados do CSV, aguardando confirmação do usuário
 
+// Lê o arquivo CSV escolhido (via biblioteca Papa Parse), reconhece as colunas e mapeia cada linha
+// para um registro do sistema; em seguida mostra a tela de prévia antes de gravar qualquer coisa
 async function importCSV(file){
   const statusEl = document.getElementById('import-status');
   statusEl.textContent = 'Lendo arquivo…';
@@ -1058,6 +1169,8 @@ async function importCSV(file){
   });
 }
 
+// Monta a tela de prévia da importação: mostra avisos de possíveis erros (coluna errada, tudo com mesmo status,
+// datas não reconhecidas, etc.), contagem de novos x já existentes e uma amostra das linhas lidas
 async function mostrarPreviaImportacao(parsed, unrecognized){
   pendingImport = parsed;
   document.getElementById('import-modo-atualizacao').checked = false;
@@ -1128,6 +1241,8 @@ async function mostrarPreviaImportacao(parsed, unrecognized){
   document.getElementById('import-preview-overlay').classList.add('open');
 }
 
+// Efetivamente grava a importação: separa os registros em "inserir" (colab novo) e "atualizar" (colab já
+// existente, só quando o status mudou e o modo atualização está marcado), e envia em lotes (chunks) à API
 async function confirmarImportacao(){
   const parsed = pendingImport;
   if(!parsed) return;
@@ -1218,10 +1333,12 @@ async function confirmarImportacao(){
   pendingImport = null;
 }
 
+// Liga os botões do modal de registro às funções correspondentes
 document.getElementById('btn-novo').addEventListener('click', openNew);
 document.getElementById('btn-cancelar').addEventListener('click', closeModal);
 document.getElementById('btn-salvar').addEventListener('click', saveForm);
 
+// Máscara de digitação do campo de data: formata automaticamente para DD/MM/AAAA enquanto o usuário digita
 document.getElementById('in-data').addEventListener('input', (e)=>{
   let v = e.target.value.replace(/\D/g,'').slice(0,8);
   let out = v;
@@ -1229,6 +1346,7 @@ document.getElementById('in-data').addEventListener('input', (e)=>{
   else if(v.length > 2) out = v.slice(0,2) + '/' + v.slice(2);
   e.target.value = out;
 });
+// Abre o mini-calendário do formulário posicionado no mês da data já digitada (ou no mês atual)
 document.getElementById('btn-abrir-calendario-data').addEventListener('click', (e)=>{
   e.stopPropagation();
   const pop = document.getElementById('form-date-popover');
@@ -1248,6 +1366,7 @@ document.addEventListener('click', (e)=>{
   }
 });
 
+// Liga os campos de bairro (do formulário e do filtro) ao popover de sugestões/autocomplete
 document.getElementById('in-bairro').addEventListener('input', ()=> mostrarSugestoesBairro('in-bairro','bairro-popover', false));
 document.getElementById('in-bairro').addEventListener('focus', ()=> mostrarSugestoesBairro('in-bairro','bairro-popover', false));
 document.getElementById('f-bairro').addEventListener('input', ()=> mostrarSugestoesBairro('f-bairro','f-bairro-popover', true));
@@ -1263,6 +1382,7 @@ document.addEventListener('click', (e)=>{
   });
 });
 
+// Botões de exportar/importar CSV e o input de arquivo escondido usado para escolher o CSV
 document.getElementById('btn-export').addEventListener('click', ()=>{ document.getElementById('csv-dropdown').classList.remove('open'); exportCSV(); });
 document.getElementById('btn-import').addEventListener('click', ()=>{ document.getElementById('csv-dropdown').classList.remove('open'); document.getElementById('import-file').click(); });
 document.getElementById('import-file').addEventListener('change', (e)=>{
@@ -1288,14 +1408,17 @@ document.getElementById('import-preview-overlay').addEventListener('click', (e)=
 document.getElementById('btn-fechar-chart-zoom').addEventListener('click', fecharChartZoom);
 document.getElementById('chart-zoom-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'chart-zoom-overlay') fecharChartZoom(); });
 
+/* ===== Painel "Atividade": linha do tempo com tudo que foi criado/editado/excluído no sistema ===== */
 let atividadeTimer = null;
-let atividadeCache = { eventos: [], nomeDe: {} };
+let atividadeCache = { eventos: [], nomeDe: {} }; // cache dos eventos já buscados + mapa email -> nome de exibição
 let atividadeChart = null;
 
+// Formata um objeto Date como string yyyy-mm-dd usando o fuso horário local (evita bug de UTC do toISOString)
 function localDateStr(dateObj){
   return dateObj.getFullYear() + '-' + String(dateObj.getMonth()+1).padStart(2,'0') + '-' + String(dateObj.getDate()).padStart(2,'0');
 }
 
+// Soma/subtrai `delta` dias de uma data no formato yyyy-mm-dd
 function shiftDateStr(dateStr, delta){
   const [y,m,d] = dateStr.split('-').map(Number);
   const dt = new Date(y, m-1, d);
@@ -1303,6 +1426,8 @@ function shiftDateStr(dateStr, delta){
   return localDateStr(dt);
 }
 
+// Busca em paralelo várias tabelas (registros, exclusões, anotações, chamados, notas...) e monta uma
+// única lista cronológica de eventos "criado / editado / excluído" para exibir no painel de atividade
 async function carregarAtividade(){
   const statusEl = document.getElementById('atividade-status');
   try{
@@ -1378,6 +1503,7 @@ async function carregarAtividade(){
   }
 }
 
+// Preenche o dropdown "Quem" do filtro de atividade com os nomes distintos que aparecem nos eventos
 function popularFiltroQuem(){
   const sel = document.getElementById('atividade-quem');
   const atual = sel.value;
@@ -1390,6 +1516,7 @@ function popularFiltroQuem(){
   sel.value = atual;
 }
 
+// Aplica os filtros do painel de atividade (data, quem, tipo de ação, busca livre) sobre o cache de eventos
 function filtrarEventosAtividade(){
   const dataFiltro = document.getElementById('atividade-data').value;
   const quemFiltro = document.getElementById('atividade-quem').value;
@@ -1414,6 +1541,7 @@ function filtrarEventosAtividade(){
   });
 }
 
+// Desenha a lista de eventos filtrados no painel de atividade, junto com os cards-resumo (total/criados/editados/excluídos)
 function renderizarAtividade(){
   const tbody = document.getElementById('atividade-tbody');
   let eventos = filtrarEventosAtividade();
@@ -1464,6 +1592,7 @@ function renderizarAtividade(){
   }).join('');
 }
 
+// Exporta os eventos de atividade filtrados atualmente para CSV
 function exportarAtividadeCSV(){
   const acaoLabel = { criado:'Criado', editado:'Editado', excluido:'Excluído' };
   const eventos = filtrarEventosAtividade();
@@ -1486,6 +1615,7 @@ function exportarAtividadeCSV(){
   URL.revokeObjectURL(url);
 }
 
+// Abre o painel de atividade, carrega os dados e passa a atualizar automaticamente a cada 20s enquanto aberto
 function abrirAtividade(){
   document.getElementById('atividade-overlay').classList.add('open');
   if(!document.getElementById('atividade-data').value){
@@ -1496,16 +1626,18 @@ function abrirAtividade(){
   atividadeTimer = setInterval(carregarAtividade, 20000);
 }
 
+// Fecha o painel de atividade e para a atualização automática
 function fecharAtividade(){
   document.getElementById('atividade-overlay').classList.remove('open');
   clearInterval(atividadeTimer);
 }
 
-/* ===== Chamados ===== */
+/* ===== Chamados (tipo um mini sistema de tickets/suporte interno) ===== */
 let chamadosTimer = null;
 let chamadoAtualId = null;
 let chamadoAtualDados = null;
 
+// Busca a tabela "profiles" para montar mapas email -> nome / foto / cargo, usados para exibir os usuários bonito na UI
 async function buscarNomesEquipe(){
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/profiles?select=email,nome,avatar_url,role', { headers: supaHeaders() });
@@ -1524,6 +1656,7 @@ async function buscarNomesEquipe(){
   }catch(e){ return { nomeDe: {}, fotoDe: {}, cargoDe: {} }; }
 }
 
+// Alterna entre as 3 telas do módulo de chamados: lista de chamados, formulário de novo chamado, ou a conversa (thread) de um chamado
 function mostrarChamadosView(view){
   document.getElementById('chamados-lista-view').style.display = view === 'lista' ? 'block' : 'none';
   document.getElementById('chamados-form-view').style.display = view === 'form' ? 'block' : 'none';
@@ -1539,8 +1672,9 @@ const TITULO_ORIGINAL = document.title;
 let notifFlashTimer = null;
 let notifFlashAceso = false;
 
-const faviconPontoCache = {};
+const faviconPontoCache = {}; // cache do favicon com "bolinha vermelha" já gerado, pra não redesenhar sempre
 
+// Desenha, num <canvas> escondido, uma cópia do favicon atual com uma bolinha vermelha no canto (indicador de notificação)
 function gerarFaviconComPonto(hrefOriginal, onReady){
   if(faviconPontoCache[hrefOriginal]){ onReady(faviconPontoCache[hrefOriginal]); return; }
   const img = new Image();
@@ -1567,6 +1701,7 @@ function gerarFaviconComPonto(hrefOriginal, onReady){
   img.src = hrefOriginal;
 }
 
+// Começa a piscar o título da aba e o favicon (alternando normal/com bolinha) a cada 1.2s
 function iniciarFlashNotificacao(){
   if(notifFlashTimer) return;
   const faviconEl = document.getElementById('favicon');
@@ -1581,25 +1716,32 @@ function iniciarFlashNotificacao(){
   }, 1200);
 }
 
+// Para de piscar o título/favicon e restaura o estado normal
 function pararFlashNotificacao(){
   if(notifFlashTimer){ clearInterval(notifFlashTimer); notifFlashTimer = null; }
   document.title = TITULO_ORIGINAL;
   syncThemeVisuals();
 }
 
+// Quando o usuário volta a olhar para a aba, para de piscar o aviso de notificação
 document.addEventListener('visibilitychange', ()=>{
   if(!document.hidden) pararFlashNotificacao();
 });
 
+// Lê do localStorage a data/hora da última vez que o usuário visitou uma seção (chamados/anotações);
+// se nunca visitou, grava "agora" como marco inicial
 function getUltimaVisita(chave){
   let v = localStorage.getItem(chave);
   if(!v){ v = new Date().toISOString(); localStorage.setItem(chave, v); }
   return v;
 }
+// Grava no localStorage que o usuário acabou de visitar aquela seção (usado para não notificar coisas já vistas)
 function marcarVisitado(chave){
   localStorage.setItem(chave, new Date().toISOString());
 }
 
+// Verifica se há novidades (mensagens em chamados que o usuário participa, ou menções a ele em anotações)
+// desde a última visita e monta a lista de notificações
 async function atualizarNotificacoes(){
   if(!currentUser) return;
   try{
@@ -1658,6 +1800,7 @@ async function atualizarNotificacoes(){
   }catch(e){ /* falha silenciosa, não é crítico */ }
 }
 
+// Atualiza o sininho de notificações (badge com contador) e a lista dentro do popover
 function renderNotificacoes(){
   const badge = document.getElementById('notif-badge');
   const count = notificacoesCache.length;
@@ -1678,6 +1821,7 @@ function renderNotificacoes(){
   ).join('');
 }
 
+// Ao clicar numa notificação, leva o usuário direto para o chamado ou para as anotações relacionadas
 function clicarNotificacao(i){
   const n = notificacoesCache[i];
   document.getElementById('notif-popover').classList.remove('open');
@@ -1689,6 +1833,7 @@ function clicarNotificacao(i){
   }
 }
 
+// Abre o modal de chamados na tela de lista e passa a atualizar a lista/thread aberta periodicamente
 function abrirChamados(){
   document.getElementById('chamados-overlay').classList.add('open');
   mostrarChamadosView('lista');
@@ -1705,6 +1850,7 @@ function abrirChamados(){
   }, 20000);
 }
 
+// Fecha o modal de chamados e para a atualização automática
 function fecharChamados(){
   document.getElementById('chamados-overlay').classList.remove('open');
   clearInterval(chamadosTimer);
@@ -1713,6 +1859,7 @@ function fecharChamados(){
 let chamadosListaCache = [];
 let chamadosNomeDeCache = {};
 
+// Busca a lista de chamados e os nomes da equipe, guarda em cache e redesenha a lista
 async function carregarChamados(){
   const listaEl = document.getElementById('chamados-lista');
   try{
@@ -1729,6 +1876,7 @@ async function carregarChamados(){
   }
 }
 
+// Filtra os chamados em cache (por status e busca de título) e desenha os cards na lista
 function renderizarListaChamados(){
   const listaEl = document.getElementById('chamados-lista');
   const statusFiltro = document.getElementById('chamado-filtro-status').value;
@@ -1762,6 +1910,7 @@ function renderizarListaChamados(){
   }).join('');
 }
 
+// Limpa o formulário e mostra a tela de "novo chamado"
 function abrirNovoChamadoForm(){
   document.getElementById('chamado-titulo').value = '';
   document.getElementById('chamado-descricao').value = '';
@@ -1769,6 +1918,7 @@ function abrirNovoChamadoForm(){
   mostrarChamadosView('form');
 }
 
+// Cria o chamado (registro em "chamados") e já grava a descrição como a primeira mensagem da conversa
 async function enviarNovoChamado(){
   const titulo = document.getElementById('chamado-titulo').value.trim();
   const descricao = document.getElementById('chamado-descricao').value.trim();
@@ -1798,12 +1948,15 @@ async function enviarNovoChamado(){
   }
 }
 
+// Abre a tela de conversa (thread) de um chamado específico
 async function abrirThreadChamado(chamadoId){
   chamadoAtualId = chamadoId;
   mostrarChamadosView('thread');
   await carregarMensagensChamado(chamadoId);
 }
 
+// Carrega os dados do chamado e todas as mensagens da conversa; monta o cabeçalho (com controle de status
+// e botão de excluir só para admin) e a lista de balões de mensagem
 async function carregarMensagensChamado(chamadoId){
   const headerEl = document.getElementById('chamado-thread-header');
   const msgsEl = document.getElementById('chamado-thread-mensagens');
@@ -1857,6 +2010,7 @@ async function carregarMensagensChamado(chamadoId){
   }
 }
 
+// (Só admin) Exclui um chamado inteiro, guardando uma cópia em "chamados_excluidos" para auditoria
 async function excluirChamado(chamadoId){
   if(!isAdmin() || !chamadoAtualDados) return;
   if(!confirm('Excluir este chamado e toda a conversa? Isso vai ficar registrado na Atividade Recente.')) return;
@@ -1882,6 +2036,7 @@ async function excluirChamado(chamadoId){
   }
 }
 
+// (Só admin) Atualiza o status do chamado (aberto/em andamento/resolvido)
 async function mudarStatusChamado(chamadoId, novoStatus){
   try{
     await supaFetch(SUPABASE_URL + '/rest/v1/chamados?id=eq.' + encodeURIComponent(chamadoId), {
@@ -1895,6 +2050,7 @@ async function mudarStatusChamado(chamadoId, novoStatus){
   }
 }
 
+// Envia uma nova mensagem na conversa do chamado atualmente aberto
 async function enviarRespostaChamado(){
   const input = document.getElementById('chamado-nova-mensagem');
   const texto = input.value.trim();
@@ -1912,10 +2068,11 @@ async function enviarRespostaChamado(){
   }
 }
 
-/* ===== Anotações ===== */
+/* ===== Anotações (mural de recados da equipe, com @menções) ===== */
 let anotacoesTimer = null;
-let anotacoesNomes = [];
+let anotacoesNomes = []; // nomes válidos para reconhecer @menções no texto
 
+// Abre o mural de anotações, carrega as mensagens e passa a atualizar automaticamente
 function abrirAnotacoes(){
   document.getElementById('anotacoes-overlay').classList.add('open');
   carregarAnotacoes();
@@ -1928,11 +2085,13 @@ function abrirAnotacoes(){
   }, 20000);
 }
 
+// Fecha o mural de anotações e para a atualização automática
 function fecharAnotacoes(){
   document.getElementById('anotacoes-overlay').classList.remove('open');
   clearInterval(anotacoesTimer);
 }
 
+// Envolve trechos "@Nome" (já escapados como HTML) numa tag colorida (pill), para destacar as menções no texto
 function destacarMencoes(textoEscapado){
   let out = textoEscapado;
   const nomesOrdenados = [...anotacoesNomes].sort((a,b) => b.length - a.length);
@@ -1949,6 +2108,7 @@ let anotacoesFotoDeCache = {};
 let anotacoesCargoDeCache = {};
 let anotacaoEditandoId = null;
 
+// Busca as anotações e os nomes da equipe, guarda em cache (incluindo a lista de nomes válidos p/ @menção) e redesenha
 async function carregarAnotacoes(){
   const listaEl = document.getElementById('anotacoes-lista');
   try{
@@ -1968,6 +2128,7 @@ async function carregarAnotacoes(){
   }
 }
 
+// Desenha a lista de anotações como balões de chat; a anotação em edição (anotacaoEditandoId) vira um textarea inline
 function renderAnotacoesLista(){
   const listaEl = document.getElementById('anotacoes-lista');
   if(anotacoesCache.length === 0){
@@ -2013,6 +2174,7 @@ function renderAnotacoesLista(){
   if(!anotacaoEditandoId) listaEl.scrollTop = listaEl.scrollHeight;
 }
 
+// Entra em modo de edição de uma anotação: troca o balão pelo textarea editável e foca o cursor no final do texto
 function iniciarEdicaoAnotacao(id){
   anotacaoEditandoId = id;
   renderAnotacoesLista();
@@ -2020,11 +2182,13 @@ function iniciarEdicaoAnotacao(id){
   if(input){ input.focus(); input.selectionStart = input.value.length; }
 }
 
+// Sai do modo de edição sem salvar
 function cancelarEdicaoAnotacao(){
   anotacaoEditandoId = null;
   renderAnotacoesLista();
 }
 
+// Salva o novo texto da anotação editada (marcando quem/quando editou)
 async function salvarEdicaoAnotacao(id){
   const input = document.getElementById('anotacao-edit-input');
   const novoTexto = input.value.trim();
@@ -2042,6 +2206,7 @@ async function salvarEdicaoAnotacao(id){
   }
 }
 
+// Exclui uma anotação, guardando uma cópia em "anotacoes_excluidas" para auditoria
 async function excluirAnotacao(id){
   const a = anotacoesCache.find(x => x.id === id);
   if(!a) return;
@@ -2062,15 +2227,17 @@ async function excluirAnotacao(id){
   }
 }
 
-/* ===== Anotações por Colab ===== */
+/* ===== Anotações por Colab (bloco de notas específico de cada registro/colaborador) ===== */
 let notaColabRegistroId = null;
 let notaColabTimer = null;
 
+// Ao clicar numa linha da tabela (fora de checkbox/botões), abre as anotações daquele registro
 function cliqueNaLinha(e, registroId, colab){
   if(e.target.closest('.row-checkbox') || e.target.closest('.icon-btn') || e.target.closest('button')) return;
   abrirNotaColab(registroId, colab);
 }
 
+// Abre o painel de anotações de um Colab específico e passa a atualizar automaticamente
 function abrirNotaColab(registroId, colab){
   notaColabRegistroId = registroId;
   document.getElementById('nota-colab-titulo').textContent = 'Anotações · Colab ' + colab;
@@ -2080,12 +2247,14 @@ function abrirNotaColab(registroId, colab){
   notaColabTimer = setInterval(carregarNotaColab, 20000);
 }
 
+// Fecha o painel de anotações do Colab e para a atualização automática
 function fecharNotaColab(){
   document.getElementById('nota-colab-overlay').classList.remove('open');
   clearInterval(notaColabTimer);
   notaColabRegistroId = null;
 }
 
+// Busca e desenha as anotações do Colab atualmente aberto
 async function carregarNotaColab(){
   if(!notaColabRegistroId) return;
   const listaEl = document.getElementById('nota-colab-lista');
@@ -2120,6 +2289,7 @@ async function carregarNotaColab(){
   }
 }
 
+// (Só admin) Exclui uma anotação de Colab
 async function excluirNotaColab(id){
   if(!isAdmin()) return;
   if(!confirm('Excluir esta anotação?')) return;
@@ -2135,6 +2305,7 @@ async function excluirNotaColab(id){
   }
 }
 
+// Envia uma nova anotação para o Colab atualmente aberto
 async function enviarNotaColab(){
   const input = document.getElementById('nota-colab-texto');
   const texto = input.value.trim();
@@ -2152,6 +2323,7 @@ async function enviarNotaColab(){
   }
 }
 
+// Envia uma nova anotação para o mural geral
 async function enviarAnotacao(){
   const input = document.getElementById('anotacao-texto');
   const texto = input.value.trim();
@@ -2170,11 +2342,14 @@ async function enviarAnotacao(){
   }
 }
 
+/* ===== Autocomplete de @menções ao digitar nas anotações ===== */
+// Detecta se o cursor está logo após um "@" (possivelmente seguido de letras) no fim do texto digitado
 function detectarMencaoParcial(valor){
   const m = valor.match(/@([^\s@]*)$/);
   return m ? m[1] : null;
 }
 
+// Atualiza o popover de sugestões de @menção conforme o usuário digita "@algumnome"
 function atualizarPopoverMencao(){
   const input = document.getElementById('anotacao-texto');
   const pop = document.getElementById('mencao-popover');
@@ -2192,6 +2367,7 @@ function atualizarPopoverMencao(){
   pop.classList.add('open');
 }
 
+// Completa a @menção parcial digitada com o nome escolhido no popover
 function selecionarMencao(nome){
   const input = document.getElementById('anotacao-texto');
   input.value = input.value.replace(/@([^\s@]*)$/, '@' + nome + ' ');
@@ -2199,6 +2375,8 @@ function selecionarMencao(nome){
   input.focus();
 }
 
+/* ===== Histórico de exclusões ===== */
+// Abre o modal de histórico e carrega a lista de registros excluídos (tabela "registros_excluidos")
 async function abrirHistorico(){
   document.getElementById('historico-overlay').classList.add('open');
   const tbody = document.getElementById('historico-tbody');
@@ -2228,6 +2406,7 @@ async function abrirHistorico(){
   }
 }
 
+// (Só admin) Apaga TODO o histórico de exclusões (irreversível)
 async function limparHistorico(){
   if(!isAdmin()) return;
   if(!confirm('Isso vai apagar TODO o histórico de exclusões, sem volta. Confirma?')) return;
@@ -2243,6 +2422,8 @@ async function limparHistorico(){
   }
 }
 
+/* ===== Backup e restauração (exporta/importa tudo como um único arquivo JSON) ===== */
+// (Só admin) Baixa um arquivo .json com todos os registros e todo o histórico de exclusões
 async function fazerBackupCompleto(){
   if(!isAdmin()) return;
   const btn = document.getElementById('btn-backup');
@@ -2281,6 +2462,7 @@ async function fazerBackupCompleto(){
   }
 }
 
+// Envia linhas em lotes (chunks de 200) fazendo upsert (insere ou sobrescreve se o id já existir), atualizando o status na tela
 async function upsertChunks(table, rows, statusEl, label){
   const CHUNK = 200;
   let done = 0;
@@ -2297,6 +2479,7 @@ async function upsertChunks(table, rows, statusEl, label){
   }
 }
 
+// (Só admin) Lê um arquivo de backup .json e restaura (upsert) os registros e o histórico de exclusões, sobrescrevendo pelo id
 async function restaurarBackup(file){
   if(!isAdmin()) return;
   const statusEl = document.getElementById('import-status');
@@ -2326,11 +2509,13 @@ async function restaurarBackup(file){
   }
 }
 
+/* ===== Mapa (usa a biblioteca Leaflet + plugin de agrupamento de marcadores) ===== */
 let leafletMap = null;
 let markerClusterGroup = null;
 
 const MARKER_COLORS = { pendente: '#C2792E', agendada: '#3B6E92', realizada: '#4B7A5D' };
 
+// Cria o ícone de marcador (gota colorida) de acordo com o status da vistoria
 function statusIcon(status){
   const color = MARKER_COLORS[status] || '#3C4F6B';
   return L.divIcon({
@@ -2342,6 +2527,8 @@ function statusIcon(status){
   });
 }
 
+// Abre o modal do mapa: cria o mapa Leaflet na primeira vez (com cluster de marcadores colorido por status
+// predominante) e sempre redesenha os marcadores com os registros filtrados que já têm coordenadas
 function abrirMapa(){
   document.getElementById('mapa-overlay').classList.add('open');
   document.getElementById('mapa-status').textContent = '';
@@ -2406,6 +2593,8 @@ function abrirMapa(){
   }, 100);
 }
 
+// (Só admin) Geocodifica todos os registros que ainda não têm coordenadas, um por vez (respeitando o limite
+// de ~1 requisição/segundo da API pública Nominatim) e grava lat/lng de volta no banco
 async function geocodificarPendentes(){
   if(!isAdmin()) return;
   const pendentes = records.filter(r => (!r.latitude || !r.longitude) && r.endereco && r.bairro);
@@ -2442,9 +2631,10 @@ async function geocodificarPendentes(){
   alert('Geocodificação concluída: ' + done + ' registro(s) processado(s).');
 }
 
-/* ===== Rota por proximidade ===== */
+/* ===== Rota por proximidade (sugere uma ordem de visita às vistorias "agendadas" no mapa) ===== */
 let rotaLayer = null;
 
+// Distância em linha reta (km) entre duas coordenadas, usando a fórmula de Haversine
 function distanciaKm(lat1, lon1, lat2, lon2){
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -2453,6 +2643,7 @@ function distanciaKm(lat1, lon1, lat2, lon2){
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Algoritmo guloso do "vizinho mais próximo": parte de um ponto inicial e sempre vai para o ponto restante mais perto
 function ordenarPorProximidade(pontos){
   const restantes = pontos.slice();
   // começa pelo ponto mais a noroeste, pra ter um ponto de partida consistente
@@ -2470,6 +2661,7 @@ function ordenarPorProximidade(pontos){
   return rota;
 }
 
+// Cria o ícone numerado (1, 2, 3...) usado para marcar a ordem dos pontos na rota traçada
 function numeroIcon(n){
   return L.divIcon({
     className: 'rota-marker',
@@ -2481,6 +2673,8 @@ function numeroIcon(n){
   });
 }
 
+// Pega as vistorias "agendadas" (com coordenadas) visíveis nos filtros atuais, calcula a ordem de visita
+// mais próxima e desenha a rota (linha numerada) no mapa
 function calcularRotaProximidade(){
   const filtered = getFiltered();
   const pontos = filtered.filter(r => r.vistoria === 'agendada' && r.latitude && r.longitude);
@@ -2527,6 +2721,7 @@ function calcularRotaProximidade(){
   document.getElementById('mapa-status').textContent = rota.length + ' parada(s) na rota — cerca de ' + distanciaTotal.toFixed(1) + ' km em linha reta entre elas. Toque nos números no mapa (ou em "Ver lista") pra ver os endereços.';
 }
 
+// Mostra/esconde o painel lateral com a lista de endereços da rota calculada
 function toggleRotaLista(){
   const painel = document.getElementById('mapa-rota-painel');
   const aberto = painel.style.display !== 'none';
@@ -2534,6 +2729,7 @@ function toggleRotaLista(){
   document.getElementById('btn-toggle-rota-lista').textContent = aberto ? 'Ver lista' : 'Ocultar lista';
 }
 
+// Remove a rota desenhada do mapa e volta a mostrar os marcadores agrupados normalmente
 function limparRota(){
   if(rotaLayer){ leafletMap.removeLayer(rotaLayer); rotaLayer = null; }
   if(markerClusterGroup) markerClusterGroup.addTo(leafletMap);
@@ -2589,6 +2785,8 @@ document.getElementById('atividade-busca').addEventListener('input', renderizarA
 document.getElementById('atividade-exportar').addEventListener('click', exportarAtividadeCSV);
 document.getElementById('btn-fechar-atividade').addEventListener('click', fecharAtividade);
 
+/* ===== Torna os painéis flutuantes (atividade, chamados, anotações, notas de colab) arrastáveis e redimensionáveis ===== */
+// Permite arrastar um painel pela sua "alça" (handle), tanto com mouse quanto com toque (touch)
 function tornarArrastavel(panelId, handleId, closeBtnId){
   const panel = document.getElementById(panelId);
   const handle = document.getElementById(handleId);
@@ -2626,6 +2824,7 @@ function tornarArrastavel(panelId, handleId, closeBtnId){
   document.addEventListener('touchend', parar);
 }
 
+// Permite redimensionar um painel arrastando sua alça no canto, tanto com mouse quanto com toque
 function tornarRedimensionavel(panelId, handleId){
   const panel = document.getElementById(panelId);
   const handle = document.getElementById(handleId);
@@ -2700,6 +2899,8 @@ document.getElementById('btn-fechar-aviso').addEventListener('click', fecharAvis
 document.getElementById('btn-fechar-historico').addEventListener('click', ()=> document.getElementById('historico-overlay').classList.remove('open'));
 document.getElementById('historico-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'historico-overlay') document.getElementById('historico-overlay').classList.remove('open'); });
 
+/* ===== Barra de ações em massa (aparece quando uma ou mais linhas da tabela estão marcadas) ===== */
+// Mostra/esconde a barra flutuante de ações em massa e atualiza o contador/permissões de acordo com a seleção
 function updateBulkBar(){
   const bar = document.getElementById('bulk-bar');
   const count = selectedIds.size;
@@ -2712,6 +2913,7 @@ function updateBulkBar(){
   document.getElementById('btn-bulk-delete').style.display = editable ? '' : 'none';
 }
 
+// Abre o modal para adicionar a mesma anotação a todos os registros selecionados
 function abrirBulkNota(){
   if(selectedIds.size === 0) return;
   document.getElementById('bulk-nota-contagem').textContent = 'Essa anotação vai ser adicionada a ' + selectedIds.size + ' registro(s) selecionado(s).';
@@ -2720,6 +2922,7 @@ function abrirBulkNota(){
   document.getElementById('bulk-nota-overlay').classList.add('open');
 }
 
+// Envia a mesma anotação para todos os registros selecionados de uma vez (POST em lote)
 async function enviarBulkNota(){
   const msgEl = document.getElementById('bulk-nota-msg');
   const texto = document.getElementById('bulk-nota-texto').value.trim();
@@ -2746,6 +2949,7 @@ async function enviarBulkNota(){
   }
 }
 
+// Aplica o mesmo status de vistoria a todos os registros selecionados, um por um
 async function bulkApplyStatus(){
   if(!canEdit()) return;
   const status = document.getElementById('bulk-status').value;
@@ -2766,6 +2970,80 @@ async function bulkApplyStatus(){
   }
 }
 
+// Converte uma lista digitada de Colabs em valores únicos, aceitando separadores comuns
+function parseBulkColabs(value){
+  return [...new Set(String(value || '').split(/[\s,;]+/).map(v => v.trim()).filter(Boolean))];
+}
+
+// Atualiza o status de vários registros localizados pelos números de Colab informados na caixa própria
+async function bulkApplyStatusByColab(){
+  if(!canEdit()) return;
+  const inputEl = document.getElementById('bulk-colab-input');
+  const statusEl = document.getElementById('bulk-colab-status');
+  const msgEl = document.getElementById('bulk-colab-msg');
+  const buttonEl = document.getElementById('btn-bulk-colab-apply');
+  const colabs = parseBulkColabs(inputEl.value);
+  const status = statusEl.value;
+
+  msgEl.textContent = '';
+  if(colabs.length === 0){
+    msgEl.textContent = 'Informe pelo menos um número de Colab.';
+    inputEl.focus();
+    return;
+  }
+  if(!status){
+    msgEl.textContent = 'Escolha o novo status da vistoria.';
+    statusEl.focus();
+    return;
+  }
+
+  const porColab = new Map();
+  records.forEach(r => {
+    const chave = normalizeColab(r.colab);
+    if(chave && !porColab.has(chave)) porColab.set(chave, r);
+  });
+  const ausentes = colabs.filter(colab => !porColab.has(normalizeColab(colab)));
+  if(ausentes.length > 0){
+    msgEl.textContent = 'Colab(s) não encontrado(s): ' + ausentes.join(', ') + '. Nenhuma alteração foi feita.';
+    return;
+  }
+
+  const encontrados = colabs.map(colab => porColab.get(normalizeColab(colab)));
+  const paraAtualizar = encontrados.filter(r => r.vistoria !== status);
+  const jaEstaoNoStatus = encontrados.length - paraAtualizar.length;
+  if(paraAtualizar.length === 0){
+    msgEl.textContent = encontrados.length + ' Colab(s) já está(ão) com o status ' + statusLabel(status) + '.';
+    return;
+  }
+
+  let confirmacao = 'Alterar ' + paraAtualizar.length + ' Colab(s) para "' + statusLabel(status) + '"?';
+  if(jaEstaoNoStatus > 0) confirmacao += ' ' + jaEstaoNoStatus + ' já está(ão) nesse status.';
+  if(!confirm(confirmacao)) return;
+
+  buttonEl.disabled = true;
+  msgEl.textContent = 'Atualizando ' + paraAtualizar.length + ' Colab(s)…';
+  try{
+    const resultados = await Promise.allSettled(paraAtualizar.map(r => updateStatusAPI(r.id, status)));
+    const atualizados = resultados.filter(r => r.status === 'fulfilled').length;
+    const falharam = resultados.length - atualizados;
+    await loadRecords(true);
+
+    if(falharam === 0){
+      inputEl.value = '';
+      statusEl.value = '';
+      msgEl.textContent = atualizados + ' Colab(s) atualizado(s) para ' + statusLabel(status) +
+        (jaEstaoNoStatus > 0 ? ' · ' + jaEstaoNoStatus + ' já estava(m) nesse status.' : '.');
+    }else{
+      msgEl.textContent = atualizados + ' atualizado(s), mas ' + falharam + ' não pôde(ram) ser atualizado(s). Tente novamente.';
+    }
+  }catch(e){
+    msgEl.textContent = 'Não foi possível atualizar os Colabs. Tente novamente.';
+  }finally{
+    buttonEl.disabled = false;
+  }
+}
+
+// Exclui todos os registros selecionados, um por um, registrando cada um no histórico de exclusões
 async function bulkDelete(){
   if(!canEdit()) return;
   if(selectedIds.size === 0) return;
@@ -2784,6 +3062,7 @@ async function bulkDelete(){
   }
 }
 
+// Marca/desmarca um registro individual na seleção quando o checkbox da linha muda
 document.getElementById('tbody').addEventListener('change', (e)=>{
   if(e.target.classList.contains('row-checkbox')){
     const id = e.target.dataset.id;
@@ -2792,6 +3071,7 @@ document.getElementById('tbody').addEventListener('change', (e)=>{
   }
 });
 
+// Checkbox "selecionar tudo": marca/desmarca todos os registros da página atual
 document.getElementById('select-all-checkbox').addEventListener('change', (e)=>{
   const checked = e.target.checked;
   const filtered = getFiltered();
@@ -2803,6 +3083,13 @@ document.getElementById('select-all-checkbox').addEventListener('change', (e)=>{
 });
 
 document.getElementById('btn-bulk-apply-status').addEventListener('click', bulkApplyStatus);
+document.getElementById('btn-bulk-colab-apply').addEventListener('click', bulkApplyStatusByColab);
+document.getElementById('bulk-colab-input').addEventListener('keydown', (e)=>{
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+    e.preventDefault();
+    bulkApplyStatusByColab();
+  }
+});
 document.getElementById('btn-bulk-delete').addEventListener('click', bulkDelete);
 document.getElementById('btn-bulk-nota').addEventListener('click', abrirBulkNota);
 document.getElementById('btn-bulk-vistoria').addEventListener('click', exportarParaVistoria);
@@ -2816,6 +3103,7 @@ document.getElementById('btn-cancelar-bulk-nota').addEventListener('click', ()=>
 document.getElementById('btn-enviar-bulk-nota').addEventListener('click', enviarBulkNota);
 document.getElementById('bulk-nota-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'bulk-nota-overlay') document.getElementById('bulk-nota-overlay').classList.remove('open'); });
 
+// Liga todos os campos de filtro (dropdowns e campos de texto) para reaplicar o filtro a cada mudança
 ['f-status','f-tiposervico'].forEach(id=>{
   document.getElementById(id).addEventListener('change', ()=>{ page = 1; render(); });
 });
@@ -2826,6 +3114,7 @@ document.getElementById('f-busca').addEventListener('input', ()=>{ page = 1; ren
 document.getElementById('f-paradas').addEventListener('change', ()=>{ page = 1; render(); });
 document.getElementById('f-paradas-dias').addEventListener('input', ()=>{ page = 1; render(); });
 
+// Clicar num cabeçalho de coluna ordena por ela; clicar de novo na mesma coluna inverte asc/desc
 document.querySelectorAll('thead th[data-key]').forEach(th=>{
   th.dataset.label = th.textContent.trim();
   th.addEventListener('click', ()=>{
@@ -2837,6 +3126,7 @@ document.querySelectorAll('thead th[data-key]').forEach(th=>{
   });
 });
 
+// Adiciona a setinha (▲/▼) no cabeçalho da coluna que está ordenando a tabela no momento
 function updateSortIndicators(){
   document.querySelectorAll('thead th[data-key]').forEach(th=>{
     const arrow = th.dataset.key === sortKey ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
@@ -2846,6 +3136,8 @@ function updateSortIndicators(){
 updateSortIndicators();
 popularBairros();
 
+/* ===== Tema visual "Admin" (modo escuro decorado com cena 3D no cabeçalho) ===== */
+// Ajusta os elementos visuais (ícone do usuário, favicon, cena 3D) de acordo com o tema ativo e se o usuário tem foto
 function syncThemeVisuals(){
   const on = document.body.classList.contains('theme-admin');
   const temFoto = !!(currentUser && currentUser.avatarUrl);
@@ -2862,6 +3154,8 @@ function syncThemeVisuals(){
 /* ===== Cena 3D do cabeçalho — tema Admin (bússola do viajante) ===== */
 let voyage3D = null;
 
+// Monta a cena 3D decorativa do cabeçalho no tema Admin (usa a biblioteca Three.js): céu estrelado, oceano
+// ondulando, um navio balançando e uma bússola girando, todos animados e reagindo ao movimento do mouse
 function iniciarVoyageScene3D(){
   if(voyage3D || typeof THREE === 'undefined') return;
   const canvas = document.getElementById('voyage-scene-3d');
@@ -2988,6 +3282,7 @@ function iniciarVoyageScene3D(){
   animar();
 }
 
+// Liga/desliga a animação 3D do cabeçalho (pausa o loop de renderização quando escondida, por economia)
 function atualizarVoyageScene3D(ligar){
   const canvas = document.getElementById('voyage-scene-3d');
   if(!canvas) return;
@@ -3001,6 +3296,7 @@ function atualizarVoyageScene3D(ligar){
   else if(!voyage3D.raf) voyage3D.animar();
 }
 
+// Monta a mensagem de saudação no topo ("Bom dia, Fulano · quinta-feira, 20 de agosto") de acordo com a hora do dia
 function atualizarSaudacao(){
   const el = document.getElementById('greeting');
   if(!el) return;
@@ -3012,9 +3308,11 @@ function atualizarSaudacao(){
   el.textContent = `${saudacao}, ${primeiroNome} · ${dataFmt}`;
 }
 
+// Mostra/esconde botões e elementos da interface de acordo com o papel do usuário logado (operador/supervisor/admin)
 function applyRolePermissions(){
   atualizarSaudacao();
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
+  document.getElementById('bulk-colab-panel').style.display = canEdit() ? '' : 'none';
   document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
@@ -3025,12 +3323,16 @@ function applyRolePermissions(){
   syncThemeVisuals();
 }
 
+// (Só admin) Alterna manualmente entre o tema normal e o tema "Admin" (decorado)
 function toggleTheme(){
   if(!isAdmin()) return;
   document.body.classList.toggle('theme-admin');
   syncThemeVisuals();
 }
 
+/* ===== Autenticação ===== */
+// Faz login via API de autenticação do Supabase (email/senha), busca o perfil (role/nome/foto) do usuário
+// e, se tudo der certo, libera a tela principal e liga os timers de atualização automática (dados, notificações, aviso)
 async function doLogin(){
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-pass').value;
@@ -3084,10 +3386,11 @@ async function doLogin(){
   }
 }
 
-/* ===== Aviso global (banner) ===== */
-let avisoDismissedEm = null;
+/* ===== Aviso global (banner que aparece pra todo mundo, tipo um recado do admin) ===== */
+let avisoDismissedEm = null; // guarda a "versão" do aviso que o usuário já fechou, pra não reaparecer sozinho
 let avisoTimer = null;
 
+// Busca se existe um aviso global ativo e mostra o banner (a não ser que o usuário já tenha fechado esse mesmo aviso)
 async function verificarAviso(){
   try{
     const res = await supaFetch(SUPABASE_URL + '/rest/v1/aviso_global?id=eq.atual&select=mensagem,criado_por,criado_em', { headers: supaHeaders() });
@@ -3103,18 +3406,21 @@ async function verificarAviso(){
   }catch(e){ /* silencioso */ }
 }
 
+// Fecha o banner e lembra qual aviso foi fechado (pra não mostrar de novo até que um aviso novo seja publicado)
 function fecharAvisoBanner(){
   const banner = document.getElementById('aviso-banner');
   avisoDismissedEm = banner.dataset.criadoEm || null;
   banner.style.display = 'none';
 }
 
+// Abre o formulário para o admin escrever/editar o aviso global
 function abrirFormAviso(){
   document.getElementById('aviso-texto').value = '';
   document.getElementById('aviso-form-msg').textContent = '';
   document.getElementById('aviso-form-overlay').classList.add('open');
 }
 
+// Publica (ou substitui) o aviso global — usa upsert na linha de id fixo "atual", então só existe um aviso por vez
 async function enviarAvisoGlobal(){
   const texto = document.getElementById('aviso-texto').value.trim();
   const msgEl = document.getElementById('aviso-form-msg');
@@ -3135,6 +3441,7 @@ async function enviarAvisoGlobal(){
   }
 }
 
+// Remove o aviso global da tela de todo mundo
 async function removerAvisoGlobal(){
   if(!confirm('Remover o aviso atual da tela de todo mundo?')) return;
   try{
@@ -3146,6 +3453,7 @@ async function removerAvisoGlobal(){
   }
 }
 
+// Faz logout: limpa todo o estado de sessão, para os timers de atualização e volta pra tela de login
 function doLogout(){
   currentRole = null;
   currentUser = null;
@@ -3165,6 +3473,7 @@ function doLogout(){
   document.getElementById('login-overlay').classList.add('open');
 }
 
+// Abre o modal de trocar senha
 function abrirTrocaSenha(){
   document.getElementById('senha-nova').value = '';
   document.getElementById('senha-confirma').value = '';
@@ -3172,6 +3481,7 @@ function abrirTrocaSenha(){
   document.getElementById('senha-overlay').classList.add('open');
 }
 
+// Valida (mínimo 6 caracteres, confirmação igual) e envia a troca de senha para a API de autenticação do Supabase
 async function salvarNovaSenha(){
   const nova = document.getElementById('senha-nova').value;
   const confirma = document.getElementById('senha-confirma').value;
@@ -3203,8 +3513,9 @@ async function salvarNovaSenha(){
 }
 
 /* ===== Foto de perfil (avatar) ===== */
-let avatarArquivoSelecionado = null;
+let avatarArquivoSelecionado = null; // arquivo escolhido pelo usuário, aguardando confirmação para upload
 
+// Abre o modal de foto de perfil, mostrando o avatar atual como prévia
 function abrirAvatar(){
   avatarArquivoSelecionado = null;
   document.getElementById('avatar-file-input').value = '';
@@ -3213,6 +3524,7 @@ function abrirAvatar(){
   document.getElementById('avatar-overlay').classList.add('open');
 }
 
+// Ao escolher um arquivo de foto, valida tipo (PNG/JPG/WEBP/GIF) e tamanho (máx. 3MB) e mostra uma prévia local
 document.getElementById('avatar-file-input').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   const msgEl = document.getElementById('avatar-msg');
@@ -3233,6 +3545,7 @@ document.getElementById('avatar-file-input').addEventListener('change', (e)=>{
   document.getElementById('avatar-preview-wrap').innerHTML = '<img class="avatar-3d avatar-3d-md avatar-3d-foto" src="' + previewUrl + '" alt="">';
 });
 
+// Envia o arquivo escolhido para o Supabase Storage (bucket "avatars") e grava a URL pública no perfil do usuário
 async function salvarAvatar(){
   const msgEl = document.getElementById('avatar-msg');
   if(!avatarArquivoSelecionado){
@@ -3268,6 +3581,7 @@ async function salvarAvatar(){
   }
 }
 
+// Remove a foto de perfil do usuário (limpa avatar_url no perfil, voltando ao avatar de iniciais)
 async function removerAvatar(){
   if(!currentUser) return;
   const msgEl = document.getElementById('avatar-msg');
@@ -3298,7 +3612,8 @@ document.getElementById('btn-fechar-zoom-avatar').addEventListener('click', fech
 document.getElementById('avatar-zoom-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-zoom-overlay') fecharZoomAvatar(); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharZoomAvatar(); });
 
-/* ===== Relatório Mensal (Obra Civil) ===== */
+/* ===== Relatório Mensal (Obra Civil) — gera arquivos .docx a partir de um modelo, usando docxtemplater ===== */
+// Abre o modal de relatório mensal, preenchendo a lista de responsáveis disponíveis para seleção
 function abrirRelatorioMensal(){
   const nomes = uniqueValues('responsavel');
   document.getElementById('relatorio-responsavel-lista').innerHTML = nomes.map(v => `
@@ -3314,10 +3629,12 @@ function abrirRelatorioMensal(){
   document.getElementById('relatorio-overlay').classList.add('open');
 }
 
+// Lê quais responsáveis estão marcados nos checkboxes do relatório
 function relatorioResponsaveisSelecionados(){
   return [...document.querySelectorAll('.relatorio-resp-check:checked')].map(el => el.value);
 }
 
+// Checkbox "Todos": marca/desmarca todos os responsáveis de uma vez
 document.getElementById('relatorio-responsavel-todos').addEventListener('change', (e)=>{
   document.querySelectorAll('.relatorio-resp-check').forEach(el => {
     el.checked = e.target.checked;
@@ -3325,6 +3642,7 @@ document.getElementById('relatorio-responsavel-todos').addEventListener('change'
   });
   document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', e.target.checked);
 });
+// Ao (des)marcar um responsável individual, atualiza se o checkbox "Todos" deve ficar marcado também
 document.getElementById('relatorio-responsavel-lista').addEventListener('change', (e)=>{
   if(!e.target.classList.contains('relatorio-resp-check')) return;
   e.target.closest('.chip-check').classList.toggle('selected', e.target.checked);
@@ -3335,6 +3653,7 @@ document.getElementById('relatorio-responsavel-lista').addEventListener('change'
   document.getElementById('relatorio-responsavel-todos-wrap').classList.toggle('selected', todasMarcadas);
 });
 
+// Formata o período do relatório por extenso (ex.: "1 DE JANEIRO A 15 DE FEVEREIRO DE 2026")
 function formatarPeriodoRelatorio(dataInicio, dataFim){
   const [y1, m1, d1] = dataInicio.split('-').map(Number);
   const [y2, m2, d2] = dataFim.split('-').map(Number);
@@ -3346,8 +3665,11 @@ function formatarPeriodoRelatorio(dataInicio, dataFim){
   return `${d1} DE ${mes1} DE ${y1} A ${d2} DE ${mes2} DE ${y2}`;
 }
 
+// Promessa que resolve depois de `ms` milissegundos — usada para dar uma pausa entre downloads de relatórios
 function pausar(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// Para cada responsável selecionado, filtra os registros de Obra Civil no período, preenche o modelo .docx
+// (usando PizZip + docxtemplater) com os dados e baixa um arquivo .docx separado por responsável
 async function gerarRelatorioMensal(){
   const msgEl = document.getElementById('relatorio-msg');
   const responsaveis = relatorioResponsaveisSelecionados();
@@ -3430,6 +3752,7 @@ document.getElementById('btn-cancelar-relatorio').addEventListener('click', ()=>
 document.getElementById('btn-gerar-relatorio').addEventListener('click', gerarRelatorioMensal);
 document.getElementById('relatorio-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'relatorio-overlay') document.getElementById('relatorio-overlay').classList.remove('open'); });
 
+/* ===== Listeners finais: login, notificações, troca de senha e atalhos de teclado ===== */
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });
 document.getElementById('login-email').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });
@@ -3454,6 +3777,8 @@ document.getElementById('btn-cancelar-senha').addEventListener('click', ()=> doc
 document.getElementById('btn-salvar-senha').addEventListener('click', salvarNovaSenha);
 document.getElementById('senha-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'senha-overlay') document.getElementById('senha-overlay').classList.remove('open'); });
 
+// Atalhos globais de teclado (só funcionam fora de campos de texto e sem nenhum modal aberto): "/" foca a
+// busca, "n" abre o formulário de novo registro
 document.addEventListener('keydown', (e)=>{
   const tag = (e.target.tagName || '').toLowerCase();
   if(tag === 'input' || tag === 'textarea' || tag === 'select') return;

@@ -1,3 +1,5 @@
+  /* Paleta de cores do tema padrão (claro), como variáveis CSS reaproveitadas em todo o arquivo.
+     O tema "Admin" (mais abaixo) redefine essas mesmas variáveis dentro de body.theme-admin. */
   :root{
     --ink:#16233A;
     --ink-soft:#3C4F6B;
@@ -53,7 +55,7 @@
   #role-badge{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600;}
   .user-box-divider{width:1px; height:16px; background:var(--line);}
 
-  /* avatares gerados */
+  /* avatares gerados (foto, ou círculo colorido com iniciais quando não há foto) */
   .avatar-3d{
     --avatar-hue:210;
     display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -76,6 +78,8 @@
   .user-avatar-wrap:empty{display:none;}
   @keyframes pulse-badge{0%,100%{transform:scale(1);} 50%{transform:scale(1.18);}}
   #notif-badge{animation:pulse-badge 1.8s ease-in-out infinite;}
+
+  /* cards de estatística (Total/Pendentes/Agendadas/Realizadas) */
   .stats{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;}
   .stat{
     background:var(--paper-2); border:1px solid var(--line); border-radius:var(--radius);
@@ -231,6 +235,7 @@
     .rail-flyout{width:min(230px, 62vw);}
   }
 
+  /* painel de filtros avançados (some/aparece com a classe .open) */
   .filters-panel{
     display:none; flex-wrap:wrap; gap:10px; align-items:center;
     background:var(--paper-2); border:1px solid var(--line);
@@ -244,6 +249,7 @@
   }
   .filters-panel input[type="checkbox"]{accent-color:var(--ink); cursor:pointer;}
 
+  /* popover genérico usado pelos mini-calendários e caixas de sugestão (bairro, menções); some/aparece com .open */
   .date-popover{
     display:block; position:absolute; top:calc(100% + 6px); left:0; z-index:60;
     background:#fff; border:1px solid var(--line); border-radius:var(--radius);
@@ -270,6 +276,7 @@
     color:var(--ink-soft); padding:4px 4px 0; margin-top:2px;
   }
   .admin-dropdown-categoria:first-child{margin-top:0;}
+  /* grade de dias dos mini-calendários (dp- = "date popover") */
   .dp-header{
     display:flex; justify-content:space-between; align-items:center;
     font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; margin-bottom:8px;
@@ -285,6 +292,7 @@
   .dp-actions{display:flex; justify-content:space-between; gap:8px; margin-top:10px;}
   .dp-actions button{padding:6px 12px; font-size:12px;}
 
+  /* botões (primário = preenchido; .secondary = contornado) */
   button{
     font-family:'IBM Plex Sans', sans-serif; font-size:13px; font-weight:500;
     padding:8px 14px; border-radius:var(--radius); border:1px solid var(--ink);
@@ -371,6 +379,7 @@
   .stamp.chamado-em_andamento{color:var(--ochre-dark); border-color:var(--ochre); background:rgba(194,121,46,0.08);}
   .stamp.chamado-resolvido{color:var(--green-dark); border-color:var(--green); background:rgba(75,122,93,0.08);}
 
+  /* ícone de alerta (⚠) que pisca quando um registro está atrasado no status (ver calcularAtrasoSLA no JS) */
   .sla-alerta{
     display:inline-block; color:var(--red-dark); font-size:12px; cursor:help;
     animation:sla-pulse 1.6s ease-in-out infinite;
@@ -378,6 +387,7 @@
   body.theme-admin .sla-alerta{color:var(--red);}
   @keyframes sla-pulse{ 0%,100%{opacity:1;} 50%{opacity:0.45;} }
 
+  /* badge flutuante fixo no rodapé, avisando de alterações que falharam por falta de rede */
   #sync-pendente-badge{
     display:none; align-items:center; gap:8px;
     position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
@@ -394,6 +404,7 @@
     #sync-pendente-badge{ bottom:calc(env(safe-area-inset-bottom, 0px) + 14px); font-size:12px; padding:8px 14px; max-width:92vw; text-align:center; }
   }
 
+  /* card de cada chamado na lista do módulo de Chamados */
   .chamado-card{
     border:1px solid var(--line); border-radius:var(--radius); background:var(--paper-2);
     padding:10px 12px; margin-bottom:8px; cursor:pointer;
@@ -403,6 +414,7 @@
   .chamado-card-titulo{font-weight:600; font-size:13px;}
   .chamado-card-meta{font-size:11px; color:var(--ink-soft);}
 
+  /* balão de mensagem/anotação (usado nos chamados, anotações e notas de colab) */
   .chat-bubble{
     border-radius:var(--radius); padding:8px 10px; margin-bottom:8px; max-width:88%;
     background:var(--paper); border:1px solid var(--line); font-size:13px;
@@ -421,6 +433,22 @@
 
   .pagination{display:flex; justify-content:center; align-items:center; gap:12px; padding:12px; font-size:13px;}
 
+  /* formulário de alteração de status por números de Colab */
+  .bulk-colab-panel{
+    background:var(--paper-2); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 3px rgba(22,35,58,0.05);
+  }
+  .bulk-colab-heading{display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .bulk-colab-heading strong{display:block; font-size:13px;}
+  .bulk-colab-heading span{display:block; color:var(--ink-soft); font-size:12px; margin-top:2px;}
+  .bulk-colab-controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .bulk-colab-controls textarea{min-width:240px; flex:1; min-height:38px; resize:vertical;}
+  .bulk-colab-controls select{min-width:190px;}
+  .bulk-colab-controls textarea, .bulk-colab-controls select{font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); color:var(--ink);}
+  .bulk-colab-controls textarea:focus, .bulk-colab-controls select:focus{outline:none; border-color:var(--blue);}
+  #bulk-colab-msg{margin-top:7px;}
+
+  /* barra flutuante de ações em massa (aparece quando linhas da tabela estão selecionadas) */
   .bulk-bar{
     display:none; align-items:center; gap:10px; flex-wrap:wrap;
     background:rgba(59,110,146,0.08); border:1px solid var(--blue);
@@ -463,6 +491,7 @@
   }
   .overlay.open .modal{transform:scale(1) translateY(0); opacity:1;}
 
+  /* modal de "zoom" no avatar de alguém */
   #avatar-zoom-overlay{z-index:120;}
   .avatar-zoom-card{
     position:relative; display:flex; align-items:stretch;
@@ -502,6 +531,7 @@
     .avatar-zoom-photo{flex-basis:220px;}
   }
 
+  /* painéis flutuantes arrastáveis/redimensionáveis (Atividade, Chamados, Anotações, Notas de Colab) */
   .floating-panel{
     display:flex; flex-direction:column;
     position:fixed; z-index:90;
@@ -529,6 +559,7 @@
       linear-gradient(135deg, transparent 0 40%, var(--ink-soft) 40% 46%, transparent 46% 54%, var(--ink-soft) 54% 60%, transparent 60% 100%);
   }
 
+  /* barra de filtros do painel de Atividade recente */
   .atividade-toolbar{
     display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
@@ -550,6 +581,7 @@
   .atividade-toolbar button.secondary{height:34px; box-sizing:border-box;}
   .atividade-toolbar .spacer{flex:1; min-width:4px;}
 
+  /* cards-resumo (Total/Criados/Editados/Excluídos) do painel de Atividade */
   .kpi-card{
     display:flex; align-items:center; gap:8px; padding:7px 12px;
     border-radius:var(--radius); border:1px solid var(--line); background:var(--paper-2); min-width:92px;
@@ -585,6 +617,7 @@
   .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px;}
   .status-msg{font-size:12px; color:var(--ink-soft); margin-top:10px; min-height:16px;}
 
+  /* lista de "chips" marcáveis (usada na seleção de responsáveis do Relatório Mensal) */
   .chip-list{display:flex; flex-wrap:wrap; gap:8px; padding:10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper);}
   .chip-check{
     display:inline-flex; align-items:center; gap:6px; padding:6px 12px 6px 8px;
@@ -596,6 +629,7 @@
   .chip-check:hover{border-color:var(--ink);}
   .footnote{font-size:11px; color:var(--ink-soft); text-align:center; margin-top:6px;}
 
+  /* ===== Responsivo: layout para telas pequenas (celular) ===== */
   @media (max-width:760px){
     body{font-size:13px;}
     .wrap{padding:16px 12px 40px;}
@@ -612,6 +646,8 @@
     .modal{max-width:92vw !important;}
     .bulk-bar{flex-direction:column; align-items:stretch;}
     .bulk-bar select, .bulk-bar button{width:100%;}
+    .bulk-colab-controls{align-items:stretch; flex-direction:column;}
+    .bulk-colab-controls textarea, .bulk-colab-controls select, .bulk-colab-controls button{width:100%; box-sizing:border-box;}
     .date-popover{width:92vw; left:50%; transform:translateX(-50%);}
 
     /* cabeçalho: caixa do usuário pode quebrar linha em telas bem pequenas */
@@ -662,7 +698,10 @@
     .empty-row td{display:block !important; text-align:center; padding:36px 12px;}
   }
 
-  /* ===== Tema Admin — capitão noturno / bússola do viajante ===== */
+  /* ===== Tema Admin — capitão noturno / bússola do viajante =====
+     Técnica: redefine as MESMAS variáveis de --root dentro de "body.theme-admin", então qualquer
+     componente que já usa var(--ink), var(--paper) etc. muda de cor sozinho quando essa classe é ativada
+     (ver toggleTheme() e syncThemeVisuals() no script.js). */
   body.theme-admin{
     --ink:#E8E1CD;
     --ink-soft:#8FA0AE;

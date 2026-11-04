@@ -759,7 +759,7 @@ document.getElementById('btn-close-sidebar').addEventListener('click', fecharSid
 document.getElementById('sidebar-backdrop').addEventListener('click', fecharSidebar); // clicar fora fecha
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharSidebar(); }); // tecla Esc fecha
 /* ao escolher uma ação (abrir mapa, chamados, exportar csv...) a sidebar fecha sozinha */
-['btn-mapa','btn-chamados','btn-anotacoes','btn-relatorio-mensal','btn-export','btn-import',
+['btn-mapa','btn-chamados','btn-anotacoes','btn-pacote-vistoria','btn-relatorio-mensal','btn-export','btn-import',
  'btn-atividade','btn-historico','btn-backup','btn-restore','btn-geocodificar','btn-abrir-aviso','btn-toggle-filtros'
 ].forEach(id => {
   const el = document.getElementById(id);
@@ -3391,6 +3391,7 @@ function applyRolePermissions(){
   atualizarSaudacao();
   document.getElementById('btn-import').style.display = canEdit() ? '' : 'none';
   document.getElementById('bulk-colab-menu-wrap').style.display = canEdit() ? '' : 'none';
+  document.getElementById('btn-pacote-vistoria').style.display = isAdmin() ? '' : 'none';
   document.getElementById('btn-relatorio-mensal').style.display = currentRole ? '' : 'none';
   document.getElementById('admin-menu-wrap').style.display = isAdmin() ? '' : 'none';
   document.getElementById('parada-wrap').style.display = isAdmin() ? 'inline-flex' : 'none';
@@ -3690,6 +3691,271 @@ document.getElementById('avatar-overlay').addEventListener('click', (e)=>{ if(e.
 document.getElementById('btn-fechar-zoom-avatar').addEventListener('click', fecharZoomAvatar);
 document.getElementById('avatar-zoom-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'avatar-zoom-overlay') fecharZoomAvatar(); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') fecharZoomAvatar(); });
+
+/* ===== Pacote documental da vistoria ===== */
+// Texto padrão fica local no navegador nesta etapa: o botão apenas copia a mensagem;
+// nenhuma resposta é enviada automaticamente para o Colab.
+const MENSAGEM_COLAB_VISTORIA = `Prezado Contribuinte,
+
+Informamos que, para o devido atendimento ao seu protocolo registrado na plataforma Colab, foi aberto o Processo Administrativo Nº {{processo}}.
+O referido processo seguirá os trâmites internos para análise e providências necessárias pela equipe responsável.
+O acompanhamento poderá ser realizado por meio dos seguintes canais:
+- Plataforma Colab, utilizando o número de protocolo original
+- Através do e-mail: protocolo@ion.niterói.rj.gov.br
+- Telefones: (21) 98300-2396 / (21) 98558-2847 (atendimento realizado apenas por WhatsApp, das 8h às 17h)
+- Atendimento presencial: Rua Visconde de Sepetiba, 987, 11º andar – Centro, Niterói/RJ, das 8h às 17h.
+Agradecemos o seu contato e permanecemos à disposição para quaisquer esclarecimentos`;
+
+const PACOTE_VISTORIA_MAX_FOTOS = 6;
+let pacoteVistoriaRecord = null;
+
+function sanitizarNomeArquivo(valor){
+  return String(valor || 'vistoria').trim().replace(/[^a-z0-9À-ÿ_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'vistoria';
+}
+
+function baixarArquivo(blob, nome){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+function textoDosNos(nos){
+  return Array.from(nos).map(n => n.textContent || '').join('');
+}
+
+function nosDeTexto(elemento){
+  return Array.from(elemento.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 't'));
+}
+
+function paragrafosDoDocumento(xmlDoc){
+  return Array.from(xmlDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'p'));
+}
+
+function localizarParagrafo(xmlDoc, trecho){
+  return paragrafosDoDocumento(xmlDoc).find(p => textoDosNos(nosDeTexto(p)).includes(trecho));
+}
+
+// Reaproveita os runs do modelo e troca somente o conteúdo textual, preservando fontes e alinhamentos.
+function definirTextoParagrafo(paragrafo, texto){
+  if(!paragrafo) return false;
+  const nos = nosDeTexto(paragrafo);
+  if(nos.length === 0) return false;
+  nos[0].textContent = String(texto || '');
+  for(let i = 1; i < nos.length; i++) nos[i].textContent = '';
+  return true;
+}
+
+// Quando o modelo separa texto fixo e variável em runs diferentes, mantém um run para cada parte.
+function definirPartesParagrafo(paragrafo, partes){
+  if(!paragrafo) return false;
+  const nos = nosDeTexto(paragrafo);
+  if(nos.length === 0) return false;
+  const valores = partes.map(v => String(v ?? ''));
+  nos[0].textContent = valores[0] || '';
+  for(let i = 1; i < nos.length; i++) nos[i].textContent = valores[i] || '';
+  return true;
+}
+
+async function carregarModeloDocx(caminho){
+  const res = await fetch(caminho);
+  if(!res.ok) throw new Error('Modelo não encontrado: ' + caminho);
+  return await res.arrayBuffer();
+}
+
+function normalizarNecessidade(valor){
+  return String(valor || '').trim().replace(/[.]+$/g, '').replace(/^necessita\s+(?:da|de)\s+/i, '').trim();
+}
+
+function mensagemColabVistoria(processo){
+  const numero = String(processo || '').trim() || '(entra o número do processo)';
+  return MENSAGEM_COLAB_VISTORIA.replace('{{processo}}', numero);
+}
+
+function atualizarMensagemPacoteVistoria(){
+  const processo = document.getElementById('pacote-vistoria-processo');
+  const mensagem = document.getElementById('pacote-vistoria-mensagem');
+  if(processo && mensagem) mensagem.value = mensagemColabVistoria(processo.value);
+}
+
+function preencherPacoteVistoriaRecord(id, limparConclusao){
+  pacoteVistoriaRecord = records.find(r => r.id === id) || null;
+  const r = pacoteVistoriaRecord;
+  document.getElementById('pacote-vistoria-colab').value = r ? (r.colab || '') : '';
+  document.getElementById('pacote-vistoria-processo').value = r ? (r.processo || '') : '';
+  document.getElementById('pacote-vistoria-endereco').value = r ? (r.endereco || '') : '';
+  document.getElementById('pacote-vistoria-bairro').value = r ? (r.bairro || '') : '';
+  if(limparConclusao) document.getElementById('pacote-vistoria-conclusao').value = '';
+  atualizarMensagemPacoteVistoria();
+}
+
+function abrirPacoteVistoria(){
+  const select = document.getElementById('pacote-vistoria-registro');
+  const lista = records.slice().sort((a,b)=> String(a.colab || '').localeCompare(String(b.colab || ''), 'pt-BR'));
+  select.innerHTML = lista.map(r => {
+    const label = [r.colab, r.endereco, r.bairro].filter(Boolean).join(' — ');
+    return `<option value="${escAttr(r.id)}">${escHtml(label || r.id)}</option>`;
+  }).join('');
+
+  if(lista.length === 0){
+    document.getElementById('pacote-vistoria-msg').textContent = 'Cadastre ao menos um registro antes de gerar o pacote documental.';
+    document.getElementById('pacote-vistoria-overlay').classList.add('open');
+    return;
+  }
+
+  const selecionado = selectedIds.size === 1 ? [...selectedIds][0] : lista[0].id;
+  select.value = lista.some(r => r.id === selecionado) ? selecionado : lista[0].id;
+  preencherPacoteVistoriaRecord(select.value, true);
+  document.getElementById('pacote-vistoria-fotos').value = '';
+  document.getElementById('pacote-vistoria-fotos-info').textContent = 'O modelo possui seis espaços para fotos.';
+  document.getElementById('pacote-vistoria-msg').textContent = '';
+  document.getElementById('pacote-vistoria-overlay').classList.add('open');
+}
+
+function fecharPacoteVistoria(){
+  document.getElementById('pacote-vistoria-overlay').classList.remove('open');
+}
+
+function arquivoImagemParaJpeg(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const maxW = 1200, maxH = 1600;
+        const escala = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * escala));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * escala));
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async blob=>{
+          URL.revokeObjectURL(url);
+          if(!blob){ reject(new Error('Não foi possível converter uma foto.')); return; }
+          resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, 'image/jpeg', 0.9);
+      }catch(e){
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('Uma das fotos não pôde ser lida.')); };
+    img.src = url;
+  });
+}
+
+async function gerarDespachoVistoriaDocx(registro, necessidade){
+  const template = await carregarModeloDocx('templates/despacho-de-vistoria.docx');
+  const zip = new PizZip(template);
+  const xmlDoc = new DOMParser().parseFromString(zip.file('word/document.xml').asText(), 'application/xml');
+  const enderecoCompleto = `${registro.endereco || ''}, ${registro.bairro || ''}.`;
+  definirPartesParagrafo(localizarParagrafo(xmlDoc, 'Assunto:'), ['Assunto: ', enderecoCompleto]);
+  definirPartesParagrafo(localizarParagrafo(xmlDoc, 'Informo que foi realizada vistoria'), ['Informo que foi realizada vistoria na ', enderecoCompleto]);
+  definirTextoParagrafo(localizarParagrafo(xmlDoc, 'Conforme constatado no relatório fotográfico'), `Conforme constatado no relatório fotográfico, necessita da ${necessidade}.`);
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+  return zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
+async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
+  const template = await carregarModeloDocx('templates/relatorio-fotografico.docx');
+  const zip = new PizZip(template);
+  const xmlDoc = new DOMParser().parseFromString(zip.file('word/document.xml').asText(), 'application/xml');
+  const relsPath = 'word/_rels/document.xml.rels';
+  const relsDoc = new DOMParser().parseFromString(zip.file(relsPath).asText(), 'application/xml');
+  definirTextoParagrafo(localizarParagrafo(xmlDoc, 'COLAB:'), `RELATORIO DE VISTORIA – COLAB: ${registro.colab || ''}`);
+  definirTextoParagrafo(localizarParagrafo(xmlDoc, 'Endereço'), `Endereço – ${registro.endereco || ''}, ${registro.bairro || ''}.`);
+
+  const fotos = await Promise.all(arquivos.slice(0, PACOTE_VISTORIA_MAX_FOTOS).map(arquivoImagemParaJpeg));
+  const paragrafoFotos = localizarParagrafo(xmlDoc, 'Endereço');
+  const runsFotos = paragrafoFotos
+    ? Array.from(paragrafoFotos.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'r'))
+      .filter(run => run.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'drawing').length > 0)
+    : [];
+  for(let i = 0; i < PACOTE_VISTORIA_MAX_FOTOS; i++){
+    if(fotos[i]){
+      zip.file(`word/media/image${i + 2}.jpeg`, fotos[i]);
+    }else{
+      if(runsFotos[i]) runsFotos[i].parentNode.removeChild(runsFotos[i]);
+      const target = `media/image${i + 2}.jpeg`;
+      Array.from(relsDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/relationships', 'Relationship'))
+        .filter(rel => rel.getAttribute('Target') === target)
+        .forEach(rel => rel.parentNode.removeChild(rel));
+      if(typeof zip.remove === 'function') zip.remove(`word/${target}`);
+    }
+  }
+
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+  zip.file(relsPath, new XMLSerializer().serializeToString(relsDoc));
+  return zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
+async function copiarMensagemPacoteVistoria(){
+  const mensagem = document.getElementById('pacote-vistoria-mensagem').value;
+  const msgEl = document.getElementById('pacote-vistoria-msg');
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(mensagem);
+    }else{
+      const campo = document.getElementById('pacote-vistoria-mensagem');
+      campo.focus();
+      campo.select();
+      document.execCommand('copy');
+    }
+    msgEl.textContent = 'Mensagem copiada para a área de transferência.';
+  }catch(e){
+    msgEl.textContent = 'Não foi possível copiar automaticamente. Selecione a mensagem e copie manualmente.';
+  }
+}
+
+async function gerarPacoteVistoria(){
+  const msgEl = document.getElementById('pacote-vistoria-msg');
+  const button = document.getElementById('btn-gerar-pacote-vistoria');
+  const necessidade = normalizarNecessidade(document.getElementById('pacote-vistoria-conclusao').value);
+  const arquivos = [...document.getElementById('pacote-vistoria-fotos').files];
+
+  msgEl.textContent = '';
+  if(!pacoteVistoriaRecord){ msgEl.textContent = 'Selecione um registro.'; return; }
+  if(!necessidade){ msgEl.textContent = 'Informe a necessidade constatada na vistoria.'; return; }
+  if(arquivos.length === 0){ msgEl.textContent = 'Escolha ao menos uma foto para o relatório fotográfico.'; return; }
+  if(arquivos.length > PACOTE_VISTORIA_MAX_FOTOS){ msgEl.textContent = 'O modelo permite no máximo seis fotos.'; return; }
+
+  button.disabled = true;
+  msgEl.textContent = 'Gerando despacho…';
+  try{
+    const despacho = await gerarDespachoVistoriaDocx(pacoteVistoriaRecord, necessidade);
+    baixarArquivo(despacho, `Despacho_Vistoria_Colab_${sanitizarNomeArquivo(pacoteVistoriaRecord.colab)}.docx`);
+    await pausar(400);
+    msgEl.textContent = 'Gerando relatório fotográfico…';
+    const fotografico = await gerarRelatorioFotograficoVistoriaDocx(pacoteVistoriaRecord, arquivos);
+    baixarArquivo(fotografico, `Relatorio_Fotografico_Colab_${sanitizarNomeArquivo(pacoteVistoriaRecord.colab)}.docx`);
+    msgEl.textContent = 'Despacho e relatório fotográfico gerados. A mensagem está pronta para copiar.';
+  }catch(e){
+    console.error(e);
+    msgEl.textContent = 'Não foi possível gerar os documentos. Confira os arquivos e tente novamente.';
+  }finally{
+    button.disabled = false;
+  }
+}
+
+document.getElementById('btn-pacote-vistoria').addEventListener('click', abrirPacoteVistoria);
+document.getElementById('btn-cancelar-pacote-vistoria').addEventListener('click', fecharPacoteVistoria);
+document.getElementById('pacote-vistoria-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'pacote-vistoria-overlay') fecharPacoteVistoria(); });
+document.getElementById('pacote-vistoria-registro').addEventListener('change', (e)=> preencherPacoteVistoriaRecord(e.target.value, true));
+document.getElementById('pacote-vistoria-processo').addEventListener('input', atualizarMensagemPacoteVistoria);
+document.getElementById('pacote-vistoria-fotos').addEventListener('change', (e)=>{
+  const total = e.target.files.length;
+  document.getElementById('pacote-vistoria-fotos-info').textContent = total === 0
+    ? 'O modelo possui seis espaços para fotos.'
+    : `${total} foto(s) selecionada(s) de ${PACOTE_VISTORIA_MAX_FOTOS} permitida(s).`;
+});
+document.getElementById('btn-copiar-mensagem-vistoria').addEventListener('click', copiarMensagemPacoteVistoria);
+document.getElementById('btn-gerar-pacote-vistoria').addEventListener('click', gerarPacoteVistoria);
 
 /* ===== Relatório Mensal (Obra Civil) — gera arquivos .docx a partir de um modelo, usando docxtemplater ===== */
 // Abre o modal de relatório mensal, preenchendo a lista de responsáveis disponíveis para seleção

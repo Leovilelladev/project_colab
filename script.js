@@ -3811,7 +3811,7 @@ function abrirPacoteVistoria(){
   select.value = lista.some(r => r.id === selecionado) ? selecionado : lista[0].id;
   preencherPacoteVistoriaRecord(select.value, true);
   document.getElementById('pacote-vistoria-fotos').value = '';
-  document.getElementById('pacote-vistoria-fotos-info').textContent = 'O modelo possui seis espaços para fotos.';
+  document.getElementById('pacote-vistoria-fotos-info').textContent = 'Selecione as fotos reais da vistoria. As imagens ilustrativas do modelo não serão utilizadas.';
   document.getElementById('pacote-vistoria-msg').textContent = '';
   document.getElementById('pacote-vistoria-overlay').classList.add('open');
 }
@@ -3868,25 +3868,42 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
   const xmlDoc = new DOMParser().parseFromString(zip.file('word/document.xml').asText(), 'application/xml');
   const relsPath = 'word/_rels/document.xml.rels';
   const relsDoc = new DOMParser().parseFromString(zip.file(relsPath).asText(), 'application/xml');
+  const NS_W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const NS_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
+  const paragrafoFotos = localizarParagrafo(xmlDoc, 'Endereço');
+  const rels = Array.from(relsDoc.getElementsByTagNameNS(NS_REL, 'Relationship'));
+  const slotsFotos = paragrafoFotos
+    ? Array.from(paragrafoFotos.getElementsByTagNameNS(NS_W, 'r'))
+      .map(run => {
+        const drawing = run.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'drawing')[0];
+        const blip = drawing ? drawing.getElementsByTagNameNS(NS_A, 'blip')[0] : null;
+        const rid = blip ? blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed') : null;
+        const rel = rid ? rels.find(item => item.getAttribute('Id') === rid) : null;
+        const target = rel ? rel.getAttribute('Target') : null;
+        return { run, rel, target };
+      })
+      // O primeiro desenho do modelo é o logotipo; os seis seguintes são os espaços de foto.
+      .filter(item => item.target && /(?:^|\/)media\//.test(item.target) && !/\/image1\.(?:jpe?g|png)$/i.test(item.target))
+    : [];
+
+  if(slotsFotos.length < PACOTE_VISTORIA_MAX_FOTOS){
+    throw new Error('O modelo do relatório fotográfico não possui seis espaços de foto válidos.');
+  }
+
   definirTextoParagrafo(localizarParagrafo(xmlDoc, 'COLAB:'), `RELATORIO DE VISTORIA – COLAB: ${registro.colab || ''}`);
   definirTextoParagrafo(localizarParagrafo(xmlDoc, 'Endereço'), `Endereço – ${registro.endereco || ''}, ${registro.bairro || ''}.`);
 
   const fotos = await Promise.all(arquivos.slice(0, PACOTE_VISTORIA_MAX_FOTOS).map(arquivoImagemParaJpeg));
-  const paragrafoFotos = localizarParagrafo(xmlDoc, 'Endereço');
-  const runsFotos = paragrafoFotos
-    ? Array.from(paragrafoFotos.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'r'))
-      .filter(run => run.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'drawing').length > 0)
-    : [];
   for(let i = 0; i < PACOTE_VISTORIA_MAX_FOTOS; i++){
+    const slot = slotsFotos[i];
     if(fotos[i]){
-      zip.file(`word/media/image${i + 2}.jpeg`, fotos[i]);
+      const caminhoImagem = 'word/' + slot.target.replace(/^\//, '');
+      zip.file(caminhoImagem, fotos[i]);
     }else{
-      if(runsFotos[i]) runsFotos[i].parentNode.removeChild(runsFotos[i]);
-      const target = `media/image${i + 2}.jpeg`;
-      Array.from(relsDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/relationships', 'Relationship'))
-        .filter(rel => rel.getAttribute('Target') === target)
-        .forEach(rel => rel.parentNode.removeChild(rel));
-      if(typeof zip.remove === 'function') zip.remove(`word/${target}`);
+      slot.run.parentNode.removeChild(slot.run);
+      if(slot.rel) slot.rel.parentNode.removeChild(slot.rel);
+      if(typeof zip.remove === 'function') zip.remove('word/' + slot.target.replace(/^\//, ''));
     }
   }
 
@@ -3951,7 +3968,7 @@ document.getElementById('pacote-vistoria-processo').addEventListener('input', at
 document.getElementById('pacote-vistoria-fotos').addEventListener('change', (e)=>{
   const total = e.target.files.length;
   document.getElementById('pacote-vistoria-fotos-info').textContent = total === 0
-    ? 'O modelo possui seis espaços para fotos.'
+    ? 'Selecione as fotos reais da vistoria. As imagens ilustrativas do modelo não serão utilizadas.'
     : `${total} foto(s) selecionada(s) de ${PACOTE_VISTORIA_MAX_FOTOS} permitida(s).`;
 });
 document.getElementById('btn-copiar-mensagem-vistoria').addEventListener('click', copiarMensagemPacoteVistoria);

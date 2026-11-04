@@ -3874,26 +3874,27 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
   const NS_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
   const paragrafoFotos = localizarParagrafo(xmlDoc, 'Endereço');
   const rels = Array.from(relsDoc.getElementsByTagNameNS(NS_REL, 'Relationship'));
-  const slotsFotos = paragrafoFotos
-    ? Array.from(paragrafoFotos.getElementsByTagNameNS(NS_W, 'r'))
-      .map(run => {
-        const drawing = run.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'drawing')[0];
-        const blip = drawing ? drawing.getElementsByTagNameNS(NS_A, 'blip')[0] : null;
-        const rid = blip ? blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed') : null;
-        const rel = rid ? rels.find(item => item.getAttribute('Id') === rid) : null;
-        const target = rel ? rel.getAttribute('Target') : null;
-        return { run, rel, target };
-      })
-      // O primeiro desenho do modelo é o logotipo; os seis seguintes são os espaços de foto.
-      .filter(item => item.target && /(?:^|\/)media\//.test(item.target) && !/\/image1\.(?:jpe?g|png)$/i.test(item.target))
-    : [];
-
-  if(slotsFotos.length < PACOTE_VISTORIA_MAX_FOTOS){
-    throw new Error('O modelo do relatório fotográfico não possui seis espaços de foto válidos.');
-  }
-
   definirTextoParagrafo(localizarParagrafo(xmlDoc, 'COLAB:'), `RELATORIO DE VISTORIA – COLAB: ${registro.colab || ''}`);
   definirTextoParagrafo(localizarParagrafo(xmlDoc, 'Endereço'), `Endereço – ${registro.endereco || ''}, ${registro.bairro || ''}.`);
+
+  const runsComDesenho = paragrafoFotos
+    ? Array.from(paragrafoFotos.getElementsByTagNameNS(NS_W, 'r'))
+      .filter(run => run.getElementsByTagNameNS(NS_A, 'drawing').length > 0)
+    : [];
+  // O primeiro desenho do modelo é o logotipo; os seis seguintes são os espaços de foto.
+  const runsFotos = runsComDesenho.slice(-PACOTE_VISTORIA_MAX_FOTOS);
+  const slotsFotos = runsFotos.map((run, index) => {
+    const drawing = run.getElementsByTagNameNS(NS_A, 'drawing')[0];
+    const blip = drawing ? drawing.getElementsByTagNameNS(NS_A, 'blip')[0] : null;
+    const rid = blip ? blip.getAttributeNS(NS_R, 'embed') : null;
+    const rel = rid ? rels.find(item => item.getAttribute('Id') === rid) : null;
+    const target = rel ? rel.getAttribute('Target') : `media/image${index + 2}.jpeg`;
+    return { run, rel, target };
+  });
+
+  if(slotsFotos.length < PACOTE_VISTORIA_MAX_FOTOS){
+    throw new Error('O modelo do relatório fotográfico não possui seis espaços de foto.');
+  }
 
   const fotos = await Promise.all(arquivos.slice(0, PACOTE_VISTORIA_MAX_FOTOS).map(arquivoImagemParaJpeg));
   for(let i = 0; i < PACOTE_VISTORIA_MAX_FOTOS; i++){
@@ -3915,13 +3916,15 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
       .map(rel => rel.getAttribute('Id'))
   );
   const blips = Array.from(xmlDoc.getElementsByTagNameNS(NS_A, 'blip'));
-  blips.forEach(blip => {
-    const rid = blip.getAttributeNS(NS_R, 'embed');
-    if(relIdsAtuais.has(rid)) return;
-    let run = blip;
-    while(run && !(run.namespaceURI === NS_W && run.localName === 'r')) run = run.parentNode;
-    if(run && run.parentNode) run.parentNode.removeChild(run);
-  });
+  if(relIdsAtuais.size > 0){
+    blips.forEach(blip => {
+      const rid = blip.getAttributeNS(NS_R, 'embed');
+      if(relIdsAtuais.has(rid)) return;
+      let run = blip;
+      while(run && !(run.namespaceURI === NS_W && run.localName === 'r')) run = run.parentNode;
+      if(run && run.parentNode) run.parentNode.removeChild(run);
+    });
+  }
 
   const ridsUsados = new Set(
     Array.from(xmlDoc.getElementsByTagNameNS(NS_A, 'blip'))

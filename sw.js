@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-processos-v2';
+const CACHE_NAME = 'controle-processos-v3';
 const APP_SHELL = [
   './',
   './index.html',

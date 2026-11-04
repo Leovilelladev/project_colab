@@ -3870,6 +3870,7 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
   const relsDoc = new DOMParser().parseFromString(zip.file(relsPath).asText(), 'application/xml');
   const NS_W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   const NS_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
   const paragrafoFotos = localizarParagrafo(xmlDoc, 'Endereço');
   const rels = Array.from(relsDoc.getElementsByTagNameNS(NS_REL, 'Relationship'));
@@ -3906,6 +3907,34 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
       if(typeof zip.remove === 'function') zip.remove('word/' + slot.target.replace(/^\//, ''));
     }
   }
+
+  // Segunda barreira: nenhum desenho pode permanecer apontando para uma relação
+  // ou arquivo de imagem que já foi removido do pacote DOCX.
+  const relIdsAtuais = new Set(
+    Array.from(relsDoc.getElementsByTagNameNS(NS_REL, 'Relationship'))
+      .map(rel => rel.getAttribute('Id'))
+  );
+  const blips = Array.from(xmlDoc.getElementsByTagNameNS(NS_A, 'blip'));
+  blips.forEach(blip => {
+    const rid = blip.getAttributeNS(NS_R, 'embed');
+    if(relIdsAtuais.has(rid)) return;
+    let run = blip;
+    while(run && !(run.namespaceURI === NS_W && run.localName === 'r')) run = run.parentNode;
+    if(run && run.parentNode) run.parentNode.removeChild(run);
+  });
+
+  const ridsUsados = new Set(
+    Array.from(xmlDoc.getElementsByTagNameNS(NS_A, 'blip'))
+      .map(blip => blip.getAttributeNS(NS_R, 'embed'))
+  );
+  Array.from(relsDoc.getElementsByTagNameNS(NS_REL, 'Relationship'))
+    .filter(rel => rel.getAttribute('Type') && rel.getAttribute('Type').endsWith('/image'))
+    .filter(rel => !ridsUsados.has(rel.getAttribute('Id')))
+    .forEach(rel => {
+      const target = rel.getAttribute('Target');
+      rel.parentNode.removeChild(rel);
+      if(target && typeof zip.remove === 'function') zip.remove('word/' + target.replace(/^\//, ''));
+    });
 
   zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
   zip.file(relsPath, new XMLSerializer().serializeToString(relsDoc));

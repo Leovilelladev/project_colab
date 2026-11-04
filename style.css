@@ -546,6 +546,14 @@
   }
   .floating-panel-header strong{font-family:'IBM Plex Mono', monospace; font-size:13px;}
   .floating-panel-body{flex:1; overflow:auto; padding:12px 14px; min-height:0;}
+  #nota-colab-overlay .nota-colab-body{overflow:hidden;}
+  #nota-colab-overlay #nota-colab-lista{
+    min-height:0; overflow:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  #nota-colab-overlay #nota-colab-titulo{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #nota-colab-overlay .nota-colab-composer{flex-shrink:0; align-items:center;}
+  #nota-colab-overlay #nota-colab-texto{min-width:0;}
   .resize-handle{
     position:absolute; right:0; bottom:0; width:22px; height:22px;
     cursor:nwse-resize; touch-action:none; z-index:2;
@@ -659,6 +667,20 @@
     }
     .floating-panel-header{cursor:default; touch-action:auto;}
     .resize-handle{display:none;}
+
+     /* notas do Colab: a lista rola sozinha e o painel acompanha a viewport que sobra acima do teclado */
+     #nota-colab-overlay{
+       top:var(--nota-colab-top, max(8px, env(safe-area-inset-top, 0px))) !important;
+       height:var(--nota-colab-height, calc(100vh - 16px)) !important;
+       height:var(--nota-colab-height, calc(100dvh - 16px)) !important;
+       min-height:0 !important; max-height:none !important;
+     }
+     #nota-colab-overlay .nota-colab-body{padding:10px 12px max(10px, env(safe-area-inset-bottom, 0px));}
+     #nota-colab-overlay #nota-colab-texto{
+       min-height:42px; padding:10px 11px; font-size:16px; line-height:1.35;
+     }
+     #nota-colab-overlay .nota-colab-composer{align-items:stretch;}
+     #nota-colab-overlay .nota-colab-composer button{flex-shrink:0; min-width:72px;}
 
     /* mapa: painel de rota vira faixa inferior, pra não tomar a tela toda */
     #mapa-rota-painel{

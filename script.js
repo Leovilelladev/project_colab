@@ -2270,6 +2270,35 @@ async function excluirAnotacao(id){
 let notaColabRegistroId = null;
 let notaColabTimer = null;
 
+// Em celulares, o teclado reduz a visual viewport sem necessariamente alterar 100vh.
+// Mantém o painel dentro da área visível e deixa somente a lista de notas rolar.
+function ajustarNotaColabAoViewport(){
+  const panel = document.getElementById('nota-colab-overlay');
+  if(!panel || !panel.classList.contains('open') || window.innerWidth > 760) return;
+  const viewport = window.visualViewport;
+  const altura = viewport ? viewport.height : window.innerHeight;
+  const deslocamento = viewport ? viewport.offsetTop : 0;
+  const margem = 8;
+  const topo = Math.max(margem, deslocamento + margem);
+  const alturaPainel = Math.max(180, altura - topo - margem);
+  panel.style.setProperty('--nota-colab-top', topo + 'px');
+  panel.style.setProperty('--nota-colab-height', alturaPainel + 'px');
+}
+
+function limparAjusteNotaColabAoViewport(){
+  const panel = document.getElementById('nota-colab-overlay');
+  if(!panel) return;
+  panel.style.removeProperty('--nota-colab-top');
+  panel.style.removeProperty('--nota-colab-height');
+}
+
+function agendarAjusteNotaColabAoViewport(){
+  requestAnimationFrame(ajustarNotaColabAoViewport);
+  // Alguns navegadores atualizam a visualViewport depois da animação do teclado.
+  setTimeout(ajustarNotaColabAoViewport, 120);
+  setTimeout(ajustarNotaColabAoViewport, 360);
+}
+
 // Ao clicar numa linha da tabela (fora de checkbox/botões), abre as anotações daquele registro
 function cliqueNaLinha(e, registroId, colab){
   if(e.target.closest('.row-checkbox') || e.target.closest('.icon-btn') || e.target.closest('button')) return;
@@ -2281,6 +2310,7 @@ function abrirNotaColab(registroId, colab){
   notaColabRegistroId = registroId;
   document.getElementById('nota-colab-titulo').textContent = 'Anotações · Colab ' + colab;
   document.getElementById('nota-colab-overlay').classList.add('open');
+  agendarAjusteNotaColabAoViewport();
   carregarNotaColab();
   clearInterval(notaColabTimer);
   notaColabTimer = setInterval(carregarNotaColab, 20000);
@@ -2289,6 +2319,7 @@ function abrirNotaColab(registroId, colab){
 // Fecha o painel de anotações do Colab e para a atualização automática
 function fecharNotaColab(){
   document.getElementById('nota-colab-overlay').classList.remove('open');
+  limparAjusteNotaColabAoViewport();
   clearInterval(notaColabTimer);
   notaColabRegistroId = null;
 }
@@ -2913,7 +2944,15 @@ tornarRedimensionavel('nota-colab-overlay', 'nota-colab-resize-handle');
 
 document.getElementById('btn-fechar-nota-colab').addEventListener('click', fecharNotaColab);
 document.getElementById('btn-enviar-nota-colab').addEventListener('click', enviarNotaColab);
+document.getElementById('nota-colab-texto').addEventListener('focus', agendarAjusteNotaColabAoViewport);
 document.getElementById('nota-colab-texto').addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); enviarNotaColab(); } });
+
+// Recalcula enquanto o teclado abre/fecha e quando a viewport visual muda no iOS/Android.
+window.addEventListener('resize', agendarAjusteNotaColabAoViewport);
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', agendarAjusteNotaColabAoViewport);
+  window.visualViewport.addEventListener('scroll', agendarAjusteNotaColabAoViewport);
+}
 
 document.getElementById('btn-historico').addEventListener('click', abrirHistorico);
 document.getElementById('btn-limpar-historico').addEventListener('click', limparHistorico);

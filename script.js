@@ -3879,12 +3879,12 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
 
   const runsComDesenho = paragrafoFotos
     ? Array.from(paragrafoFotos.getElementsByTagNameNS(NS_W, 'r'))
-      .filter(run => run.getElementsByTagNameNS(NS_A, 'drawing').length > 0)
+      .filter(run => run.getElementsByTagNameNS(NS_W, 'drawing').length > 0)
     : [];
   // O primeiro desenho do modelo é o logotipo; os seis seguintes são os espaços de foto.
   const runsFotos = runsComDesenho.slice(-PACOTE_VISTORIA_MAX_FOTOS);
   const slotsFotos = runsFotos.map((run, index) => {
-    const drawing = run.getElementsByTagNameNS(NS_A, 'drawing')[0];
+    const drawing = run.getElementsByTagNameNS(NS_W, 'drawing')[0];
     const blip = drawing ? drawing.getElementsByTagNameNS(NS_A, 'blip')[0] : null;
     const rid = blip ? blip.getAttributeNS(NS_R, 'embed') : null;
     const rel = rid ? rels.find(item => item.getAttribute('Id') === rid) : null;

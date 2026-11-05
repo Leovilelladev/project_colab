@@ -3949,6 +3949,31 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
   // sozinho para uma página extra. Remova apenas os parágrafos vazios finais.
   const body = xmlDoc.getElementsByTagNameNS(NS_W, 'body')[0];
   if(body){
+    // O modelo coloca uma quebra de seção contínua no parágrafo das fotos e
+    // deixa a seção final do corpo sem conteúdo. O Word pode paginar essa
+    // seção vazia como uma folha extra. Mantém as margens da seção das fotos,
+    // leva essas propriedades para a seção final e preserva cabeçalho/rodapé.
+    const propriedadesParagrafo = Array.from(paragrafoFotos.children)
+      .find(node => node.namespaceURI === NS_W && node.localName === 'pPr');
+    const secaoFotos = propriedadesParagrafo
+      ? Array.from(propriedadesParagrafo.children)
+        .find(node => node.namespaceURI === NS_W && node.localName === 'sectPr')
+      : null;
+    const secaoCorpo = Array.from(body.children)
+      .find(node => node.namespaceURI === NS_W && node.localName === 'sectPr');
+
+    if(secaoFotos && secaoCorpo){
+      const referencias = Array.from(secaoCorpo.children)
+        .filter(node => node.namespaceURI === NS_W && /^(headerReference|footerReference)$/.test(node.localName));
+      const propriedadesPagina = Array.from(secaoFotos.children)
+        .filter(node => node.namespaceURI === NS_W
+          && !/^(headerReference|footerReference|type|sectPrChange)$/.test(node.localName));
+      while(secaoCorpo.firstChild) secaoCorpo.removeChild(secaoCorpo.firstChild);
+      referencias.forEach(node => secaoCorpo.appendChild(node));
+      propriedadesPagina.forEach(node => secaoCorpo.appendChild(xmlDoc.importNode(node, true)));
+      propriedadesParagrafo.removeChild(secaoFotos);
+    }
+
     const bodyChildren = Array.from(body.childNodes);
     for(let i = bodyChildren.length - 1; i >= 0; i--){
       const node = bodyChildren[i];

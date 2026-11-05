@@ -4018,23 +4018,53 @@ async function gerarPacoteVistoria(){
   const button = document.getElementById('btn-gerar-pacote-vistoria');
   const necessidade = normalizarNecessidade(document.getElementById('pacote-vistoria-conclusao').value);
   const arquivos = [...document.getElementById('pacote-vistoria-fotos').files];
+  const registro = pacoteVistoriaRecord;
 
   msgEl.textContent = '';
-  if(!pacoteVistoriaRecord){ msgEl.textContent = 'Selecione um registro.'; return; }
+  if(!registro){ msgEl.textContent = 'Selecione um registro.'; return; }
   if(!necessidade){ msgEl.textContent = 'Informe a necessidade constatada na vistoria.'; return; }
   if(arquivos.length === 0){ msgEl.textContent = 'Escolha ao menos uma foto para o relatório fotográfico.'; return; }
   if(arquivos.length > PACOTE_VISTORIA_MAX_FOTOS){ msgEl.textContent = 'O modelo permite no máximo seis fotos.'; return; }
 
+  const jaRealizada = registro.vistoria === 'realizada';
+  const confirmacao = jaRealizada
+    ? `Gerar os documentos da vistoria do Colab ${registro.colab}? O status já consta como Realizada.`
+    : `Gerar os documentos da vistoria do Colab ${registro.colab} e alterar o status para Realizada?`;
+  if(!confirm(confirmacao)){
+    msgEl.textContent = 'Geração cancelada. Nenhum status foi alterado.';
+    return;
+  }
+
   button.disabled = true;
   msgEl.textContent = 'Gerando despacho…';
   try{
-    const despacho = await gerarDespachoVistoriaDocx(pacoteVistoriaRecord, necessidade);
-    baixarArquivo(despacho, `Despacho_Vistoria_Colab_${sanitizarNomeArquivo(pacoteVistoriaRecord.colab)}.docx`);
-    await pausar(400);
+    const despacho = await gerarDespachoVistoriaDocx(registro, necessidade);
     msgEl.textContent = 'Gerando relatório fotográfico…';
-    const fotografico = await gerarRelatorioFotograficoVistoriaDocx(pacoteVistoriaRecord, arquivos);
-    baixarArquivo(fotografico, `Relatorio_Fotografico_Colab_${sanitizarNomeArquivo(pacoteVistoriaRecord.colab)}.docx`);
-    msgEl.textContent = 'Despacho e relatório fotográfico gerados. A mensagem está pronta para copiar.';
+    const fotografico = await gerarRelatorioFotograficoVistoriaDocx(registro, arquivos);
+
+    let falhaAtualizarStatus = false;
+    if(!jaRealizada){
+      msgEl.textContent = 'Salvando status da vistoria…';
+      try{
+        await updateStatusAPI(registro.id, 'realizada');
+        registro.vistoria = 'realizada';
+        const registroLocal = records.find(r => r.id === registro.id);
+        if(registroLocal) registroLocal.vistoria = 'realizada';
+        render();
+      }catch(e){
+        console.error(e);
+        falhaAtualizarStatus = true;
+      }
+    }
+
+    baixarArquivo(despacho, `Despacho_Vistoria_Colab_${sanitizarNomeArquivo(registro.colab)}.docx`);
+    await pausar(400);
+    baixarArquivo(fotografico, `Relatorio_Fotografico_Colab_${sanitizarNomeArquivo(registro.colab)}.docx`);
+    msgEl.textContent = falhaAtualizarStatus
+      ? 'Documentos gerados, mas não foi possível salvar o status como Realizada. Atualize o status manualmente.'
+      : jaRealizada
+        ? 'Documentos gerados. A vistoria já estava marcada como Realizada.'
+        : 'Documentos gerados e vistoria marcada como Realizada. A mensagem está pronta para copiar.';
   }catch(e){
     console.error(e);
     msgEl.textContent = 'Não foi possível gerar os documentos. Confira os arquivos e tente novamente.';

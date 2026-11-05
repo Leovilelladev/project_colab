@@ -3939,6 +3939,11 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
       if(target && typeof zip.remove === 'function') zip.remove('word/' + target.replace(/^\//, ''));
     });
 
+  // O modelo traz marcadores de quebra já renderizados em cada foto. Eles não
+  // são quebras reais e, quando ficam na última foto, criam uma página vazia.
+  Array.from(xmlDoc.getElementsByTagNameNS(NS_W, 'lastRenderedPageBreak'))
+    .forEach(node => { if(node.parentNode) node.parentNode.removeChild(node); });
+
   zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
   zip.file(relsPath, new XMLSerializer().serializeToString(relsDoc));
   return zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });

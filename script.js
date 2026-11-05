@@ -3944,6 +3944,27 @@ async function gerarRelatorioFotograficoVistoriaDocx(registro, arquivos){
   Array.from(xmlDoc.getElementsByTagNameNS(NS_W, 'lastRenderedPageBreak'))
     .forEach(node => { if(node.parentNode) node.parentNode.removeChild(node); });
 
+  // O Word mantém um parágrafo final vazio no corpo do documento. Se a última
+  // foto ocupa todo o espaço disponível, esse parágrafo pode ser empurrado
+  // sozinho para uma página extra. Remova apenas os parágrafos vazios finais.
+  const body = xmlDoc.getElementsByTagNameNS(NS_W, 'body')[0];
+  if(body){
+    const bodyChildren = Array.from(body.childNodes);
+    for(let i = bodyChildren.length - 1; i >= 0; i--){
+      const node = bodyChildren[i];
+      if(node.nodeType !== 1) continue;
+      if(node.localName === 'sectPr') continue;
+      if(node.localName !== 'p') break;
+      const temTexto = textoDosNos(nosDeTexto(node)).trim().length > 0;
+      const temConteudoVisual = node.getElementsByTagNameNS(NS_W, 'drawing').length > 0
+        || node.getElementsByTagNameNS(NS_W, 'pict').length > 0
+        || node.getElementsByTagNameNS(NS_W, 'object').length > 0
+        || node.getElementsByTagNameNS(NS_W, 'br').length > 0;
+      if(temTexto || temConteudoVisual) break;
+      body.removeChild(node);
+    }
+  }
+
   zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
   zip.file(relsPath, new XMLSerializer().serializeToString(relsDoc));
   return zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });

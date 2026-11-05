@@ -3794,22 +3794,26 @@ function preencherPacoteVistoriaRecord(id, limparConclusao){
 }
 
 function abrirPacoteVistoria(){
-  const select = document.getElementById('pacote-vistoria-registro');
-  const lista = records.slice().sort((a,b)=> String(a.colab || '').localeCompare(String(b.colab || ''), 'pt-BR'));
-  select.innerHTML = lista.map(r => {
-    const label = [r.colab, r.endereco, r.bairro].filter(Boolean).join(' — ');
-    return `<option value="${escAttr(r.id)}">${escHtml(label || r.id)}</option>`;
-  }).join('');
-
-  if(lista.length === 0){
-    document.getElementById('pacote-vistoria-msg').textContent = 'Cadastre ao menos um registro antes de gerar o pacote documental.';
-    document.getElementById('pacote-vistoria-overlay').classList.add('open');
+  if(selectedIds.size !== 1){
+    alert(selectedIds.size === 0
+      ? 'Marque um registro na tabela antes de gerar o despacho e o relatório fotográfico.'
+      : 'Marque apenas um registro na tabela para gerar o despacho e o relatório fotográfico.');
     return;
   }
 
-  const selecionado = selectedIds.size === 1 ? [...selectedIds][0] : lista[0].id;
-  select.value = lista.some(r => r.id === selecionado) ? selecionado : lista[0].id;
-  preencherPacoteVistoriaRecord(select.value, true);
+  const selecionado = [...selectedIds][0];
+  const registroSelecionado = records.find(r => r.id === selecionado);
+  if(!registroSelecionado){
+    alert('O registro marcado não está disponível. Atualize a lista e tente novamente.');
+    return;
+  }
+
+  const select = document.getElementById('pacote-vistoria-registro');
+  const label = [registroSelecionado.colab, registroSelecionado.endereco, registroSelecionado.bairro].filter(Boolean).join(' — ');
+  select.innerHTML = `<option value="${escAttr(registroSelecionado.id)}">${escHtml(label || registroSelecionado.id)}</option>`;
+  select.value = String(registroSelecionado.id);
+  select.disabled = true;
+  preencherPacoteVistoriaRecord(registroSelecionado.id, true);
   document.getElementById('pacote-vistoria-fotos').value = '';
   document.getElementById('pacote-vistoria-fotos-info').textContent = 'Selecione as fotos reais da vistoria. As imagens ilustrativas do modelo não serão utilizadas.';
   document.getElementById('pacote-vistoria-msg').textContent = '';
@@ -4076,7 +4080,6 @@ async function gerarPacoteVistoria(){
 document.getElementById('btn-pacote-vistoria').addEventListener('click', abrirPacoteVistoria);
 document.getElementById('btn-cancelar-pacote-vistoria').addEventListener('click', fecharPacoteVistoria);
 document.getElementById('pacote-vistoria-overlay').addEventListener('click', (e)=>{ if(e.target.id === 'pacote-vistoria-overlay') fecharPacoteVistoria(); });
-document.getElementById('pacote-vistoria-registro').addEventListener('change', (e)=> preencherPacoteVistoriaRecord(e.target.value, true));
 document.getElementById('pacote-vistoria-processo').addEventListener('input', atualizarMensagemPacoteVistoria);
 document.getElementById('pacote-vistoria-fotos').addEventListener('change', (e)=>{
   const total = e.target.files.length;
